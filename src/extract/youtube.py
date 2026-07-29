@@ -1,5 +1,6 @@
 import pandas as pd
 from googleapiclient.discovery import build
+from datetime import date
 
 
 YOUTUBE_ANALYTICS_START_DATE = "2020-03-01"
@@ -156,3 +157,27 @@ def extract_video_analytics(credentials, videos_df):
             )
 
     return pd.DataFrame(analytics_rows)
+
+def extract_country_views(youtube_analytics):
+    response = (
+        youtube_analytics.reports()
+        .query(
+            ids="channel==MINE",
+            startDate="2020-03-01",
+            endDate=date.today().isoformat(),
+            metrics="views",
+            dimensions="country",
+            sort="-views",
+        )
+        .execute()
+    )
+
+    rows = response.get("rows", [])
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "country_code",
+            "views",
+        ],
+    )

@@ -68,3 +68,19 @@ def load_dataframe_to_bigquery(
         f"\nLoaded {destination_table.num_rows} rows "
         f"to {table_id}"
     )
+
+def run_bigquery_query(query: str) -> None:
+    """
+    Run a SQL query in BigQuery and wait for it to finish.
+    """
+
+    client = get_bigquery_client()
+
+    query_job = client.query(
+        query,
+        location=LOCATION,
+    )
+
+    query_job.result()
+
+    print("\nBigQuery query completed successfully.")
