@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Credentials and secrets
+client_secret.json
+token.json
+*.key
+*.pem
+
+# Local data
+data/
+
+# Environment variables
+.env
+.env.*
+
+# Editor and operating system
+.vscode/
+.DS_Store
+Thumbs.db
