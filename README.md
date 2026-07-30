@@ -41,30 +41,29 @@ Rather than focusing only on visualization, MAAM emphasizes data engineering con
 ## Architecture
 
 ```
-                 YouTube Data API
-                        │
-                 YouTube Analytics API
-                        │
-                 BeatStars CSV Export
-                        │
-                        ▼
-              Python ETL Pipeline
-                        │
-        ┌───────────────┴───────────────┐
-        ▼                               ▼
-     Bronze                         Validation
-        │
-        ▼
-      Silver
-        │
-        ▼
-       Gold
-        │
-        ▼
-     BigQuery
-        │
-        ▼
-   Google Data Studio Dashboard
+YouTube Data API        YouTube Analytics API        BeatStars CSV Export
+        │                        │                            │
+        └────────────────────────┴────────────────────────────┘
+                                 │
+                                 ▼
+                        Python ETL Pipeline
+                 Extract → Clean → Validate → Transform
+                                 │
+                                 ▼
+                         Local Silver Parquet
+                                 │
+                                 ▼
+                         Google BigQuery
+                       ┌─────────┴─────────┐
+                       │                   │
+                       ▼                   ▼
+                 Silver Datasets      Gold Datasets
+                                      SQL transformations,
+                                      matching rules and
+                                      analytical models
+                                             │
+                                             ▼
+                                  Google Data Studio Dashboard
 ```
 
 ---
