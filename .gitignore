@@ -23,3 +23,10 @@ data/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Python
+.pytest_cache/
+.mypy_cache/
+
+# macOS
+.AppleDouble
