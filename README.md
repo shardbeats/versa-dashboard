@@ -149,6 +149,21 @@ README.md
 
 ---
 
+## Requirements
+
+This project uses private YouTube Analytics data, private BeatStars sales exports and a personal Google Cloud project.
+
+The repository is intended to demonstrate the design and implementation of an end-to-end data engineering solution.
+
+To run the pipeline yourself, you would need:
+
+- Your own Google Cloud project
+- OAuth credentials (`client_secret.json`)
+- YouTube Data API enabled
+- YouTube Analytics API enabled
+- A BeatStars sales export (CSV)
+- A BigQuery dataset
+
 ## Running the Pipeline
 
 Clone the repository.
