@@ -164,17 +164,19 @@ To run the pipeline yourself, you would need:
 - A BeatStars sales export (CSV)
 - A BigQuery dataset
 
+---
+
+The commands below assume that the required credentials, source data and Google Cloud resources have already been configured.
+
 ## Running the Pipeline
 
-Clone the repository.
-
-Create and activate a virtual environment.
+Activate the virtual environment:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Run the complete pipeline.
+Run the complete ETL pipeline:
 
 ```powershell
 python main.py
