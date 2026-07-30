@@ -28,15 +28,35 @@ INNER JOIN
 """
 
 
-MANUAL_BEATSTARS_OVERRIDES_QUERY = """
+BEATSTARS_MATCHING_RULES_QUERY = """
 CREATE OR REPLACE TABLE
-    `versa-dashboard.gold.manual_beatstars_overrides`
+    `versa-dashboard.gold.beatstars_matching_rules`
 AS
 
 SELECT
+    'manual_match' AS rule_type,
     'Xcsz6v0JjOY' AS youtube_video_id,
-    'Walk My Choppa' AS beatstars_product_name,
-    1330 AS beatstars_quantity
+    'Walk My Choppa' AS source_product_name,
+    1330 AS source_quantity,
+    'Walk My Choppa' AS canonical_product_name
+
+UNION ALL
+
+SELECT
+    'merge',
+    NULL,
+    'In My Cup',
+    43,
+    'In My Cup'
+
+UNION ALL
+
+SELECT
+    'merge',
+    NULL,
+    'In My Cup',
+    3,
+    'In My Cup'
 """
 
 
@@ -45,17 +65,61 @@ CREATE OR REPLACE TABLE
     `versa-dashboard.gold.beatstars_sales_performance`
 AS
 
-SELECT
-    product_name,
-    product_type,
-    quantity,
-    gross_amount,
-    discounts,
-    collab_amount,
-    beatstars_fee,
-    net_revenue
+WITH merge_rules AS (
+    SELECT
+        source_product_name,
+        source_quantity,
+        canonical_product_name
+    FROM `versa-dashboard.gold.beatstars_matching_rules`
+    WHERE rule_type = 'merge'
+),
 
-FROM `versa-dashboard.silver.sales_summary`
+regular_sales AS (
+    SELECT
+        sales.product_name,
+        sales.product_type,
+        sales.quantity,
+        sales.gross_amount,
+        sales.discounts,
+        sales.collab_amount,
+        sales.beatstars_fee,
+        sales.net_revenue
+    FROM `versa-dashboard.silver.sales_summary` AS sales
+
+    LEFT JOIN merge_rules AS rules
+        ON sales.product_name = rules.source_product_name
+        AND sales.quantity = rules.source_quantity
+
+    WHERE rules.source_product_name IS NULL
+),
+
+merged_sales AS (
+    SELECT
+        rules.canonical_product_name AS product_name,
+        sales.product_type,
+        SUM(sales.quantity) AS quantity,
+        SUM(sales.gross_amount) AS gross_amount,
+        SUM(sales.discounts) AS discounts,
+        SUM(sales.collab_amount) AS collab_amount,
+        SUM(sales.beatstars_fee) AS beatstars_fee,
+        SUM(sales.net_revenue) AS net_revenue
+
+    FROM `versa-dashboard.silver.sales_summary` AS sales
+
+    INNER JOIN merge_rules AS rules
+        ON sales.product_name = rules.source_product_name
+        AND sales.quantity = rules.source_quantity
+
+    GROUP BY
+        rules.canonical_product_name,
+        sales.product_type
+)
+
+SELECT * FROM regular_sales
+
+UNION ALL
+
+SELECT * FROM merged_sales
 """
 
 
@@ -71,9 +135,7 @@ WITH youtube_beats AS (
         beat_name,
         published_at
     FROM `versa-dashboard.silver.dim_youtube_video`
-    WHERE
-        is_short = FALSE
-        AND published_at >= TIMESTAMP('2020-03-01')
+    WHERE is_short = FALSE
 ),
 
 youtube_name_counts AS (
@@ -92,6 +154,15 @@ beatstars_beats AS (
     FROM `versa-dashboard.gold.beatstars_sales_performance`
     WHERE product_type = 'track'
     GROUP BY product_name
+),
+
+manual_matches AS (
+    SELECT
+        youtube_video_id,
+        source_product_name AS beatstars_product_name,
+        source_quantity AS beatstars_quantity
+    FROM `versa-dashboard.gold.beatstars_matching_rules`
+    WHERE rule_type = 'manual_match'
 )
 
 SELECT
@@ -109,7 +180,7 @@ SELECT
     ) AS beatstars_match_count,
 
     COALESCE(
-        overrides.beatstars_product_name,
+        manual.beatstars_product_name,
         CASE
             WHEN
                 yc.youtube_match_count = 1
@@ -120,7 +191,7 @@ SELECT
     ) AS beatstars_product_name,
 
     COALESCE(
-        overrides.beatstars_quantity,
+        manual.beatstars_quantity,
         CASE
             WHEN
                 yc.youtube_match_count = 1
@@ -131,7 +202,7 @@ SELECT
     ) AS beatstars_quantity,
 
     CASE
-        WHEN overrides.youtube_video_id IS NOT NULL
+        WHEN manual.youtube_video_id IS NOT NULL
             THEN 'manual'
 
         WHEN bs.product_name IS NULL
@@ -153,10 +224,8 @@ LEFT JOIN youtube_name_counts AS yc
 LEFT JOIN beatstars_beats AS bs
     ON y.beat_name = bs.product_name
 
-LEFT JOIN
-    `versa-dashboard.gold.manual_beatstars_overrides`
-    AS overrides
-    ON y.video_id = overrides.youtube_video_id
+LEFT JOIN manual_matches AS manual
+    ON y.video_id = manual.youtube_video_id
 """
 
 

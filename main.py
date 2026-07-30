@@ -27,7 +27,7 @@ from src.transform.gold import (
     BEATSTARS_SALES_PERFORMANCE_QUERY,
     CROSS_PLATFORM_BEAT_PERFORMANCE_QUERY,
     DIM_BEAT_QUERY,
-    MANUAL_BEATSTARS_OVERRIDES_QUERY,
+    BEATSTARS_MATCHING_RULES_QUERY,
     YOUTUBE_VIDEO_PERFORMANCE_QUERY,
 )
 from src.transform.youtube import (
@@ -236,7 +236,7 @@ def run_beatstars_pipeline():
 
     # Create manual BeatStars overrides.
     run_bigquery_query(
-        MANUAL_BEATSTARS_OVERRIDES_QUERY
+    BEATSTARS_MATCHING_RULES_QUERY
     )
 
     # Build BeatStars Gold.

@@ -159,6 +159,13 @@ def extract_video_analytics(credentials, videos_df):
     return pd.DataFrame(analytics_rows)
 
 def extract_country_views(youtube_analytics):
+    """
+    Extract YouTube views grouped by country.
+
+    Returns:
+        pd.DataFrame
+    """
+
     response = (
         youtube_analytics.reports()
         .query(
@@ -174,10 +181,19 @@ def extract_country_views(youtube_analytics):
 
     rows = response.get("rows", [])
 
-    return pd.DataFrame(
+    country_df = pd.DataFrame(
         rows,
         columns=[
             "country_code",
             "views",
         ],
     )
+
+    country_df["views"] = country_df["views"].astype(int)
+
+    country_df["view_share_percent"] = (
+    country_df["views"]
+    / country_df["views"].sum()
+    ).round(4)
+
+    return country_df
