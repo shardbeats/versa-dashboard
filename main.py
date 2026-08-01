@@ -1,3 +1,5 @@
+import argparse
+
 from google.cloud import bigquery
 from googleapiclient.discovery import build
 
@@ -268,15 +270,54 @@ def run_full_pipeline():
     run_beatstars_pipeline()
 
 
-def main():
-    print(
-        "\n========== MAAM PIPELINE STARTED ==========\n"
+def parse_arguments():
+    """
+    Parse the pipeline selected from the command line.
+    """
+
+    parser = argparse.ArgumentParser(
+        description="Run a MAAM data pipeline."
     )
 
-    run_full_pipeline()
+    parser.add_argument(
+        "pipeline",
+        nargs="?",
+        default="full",
+        choices=[
+            "youtube",
+            "beatstars",
+            "full",
+        ],
+        help=(
+            "Pipeline to run: "
+            "youtube, beatstars or full. "
+            "Defaults to full."
+        ),
+    )
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
 
     print(
-        "\n========== MAAM PIPELINE COMPLETED ==========\n"
+        f"\n========== MAAM {args.pipeline.upper()} "
+        "PIPELINE STARTED ==========\n"
+    )
+
+    if args.pipeline == "youtube":
+        run_youtube_pipeline()
+
+    elif args.pipeline == "beatstars":
+        run_beatstars_pipeline()
+
+    else:
+        run_full_pipeline()
+
+    print(
+        f"\n========== MAAM {args.pipeline.upper()} "
+        "PIPELINE COMPLETED ==========\n"
     )
 
 
