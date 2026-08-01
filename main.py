@@ -236,7 +236,7 @@ def run_beatstars_pipeline():
 
     # Create manual BeatStars overrides.
     run_bigquery_query(
-    BEATSTARS_MATCHING_RULES_QUERY
+        BEATSTARS_MATCHING_RULES_QUERY
     )
 
     # Build BeatStars Gold.
@@ -259,13 +259,21 @@ def run_beatstars_pipeline():
     )
 
 
+def run_full_pipeline():
+    """
+    Run both the YouTube and BeatStars pipelines.
+    """
+
+    run_youtube_pipeline()
+    run_beatstars_pipeline()
+
+
 def main():
     print(
         "\n========== MAAM PIPELINE STARTED ==========\n"
     )
 
-    run_youtube_pipeline()
-    run_beatstars_pipeline()
+    run_full_pipeline()
 
     print(
         "\n========== MAAM PIPELINE COMPLETED ==========\n"
