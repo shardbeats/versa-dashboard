@@ -26,6 +26,7 @@ from src.transform.beatstars import (
     validate_beatstars_sales,
 )
 from src.transform.gold import (
+    BEATSTARS_DAILY_BEAT_SALES_QUERY,
     BEATSTARS_SALES_PERFORMANCE_QUERY,
     CROSS_PLATFORM_BEAT_PERFORMANCE_QUERY,
     DIM_BEAT_QUERY,
@@ -244,6 +245,11 @@ def run_beatstars_pipeline():
     # Build BeatStars Gold.
     run_bigquery_query(
         BEATSTARS_SALES_PERFORMANCE_QUERY
+    )
+
+    # Build daily BeatStars sales history.
+    run_bigquery_query(
+        BEATSTARS_DAILY_BEAT_SALES_QUERY
     )
 
     # Build the shared Beat dimension.

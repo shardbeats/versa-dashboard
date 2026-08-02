@@ -76,12 +76,14 @@ def parse_transaction_rows(
 
     current_invoice = None
     current_order_timestamp_raw = None
+    current_store_type = None
     current_item_sequence = 0
     current_order_item_id = None
 
     for row in transactions_df.itertuples(index=False):
         if pd.notna(row.invoice_number):
             current_invoice = row.invoice_number
+            current_store_type = row.store_type
             current_item_sequence = 0
 
         if pd.notna(row.date):
@@ -103,7 +105,7 @@ def parse_transaction_rows(
                     current_order_timestamp_raw
                 ),
                 "status": row.status,
-                "store_type": row.store_type,
+                "store_type": current_store_type,
                 "beat_name_raw": row.item_name,
                 "list_price": row.list_price,
                 "discount_amount": row.discount,
