@@ -11,22 +11,28 @@ client_secret.json
 token.json
 *.key
 *.pem
-
-# Local data
-data/
+*.json.bak
 
 # Environment variables
 .env
 .env.*
 
-# Editor and operating system
+# Local data
+data/
+*.parquet
+*.csv
+
+# VS Code
 .vscode/
+
+# OS
 .DS_Store
 Thumbs.db
+.AppleDouble
 
 # Python
 .pytest_cache/
 .mypy_cache/
+.coverage
 
-# macOS
-.AppleDouble
+docs/maam-dashboard-old.jpg

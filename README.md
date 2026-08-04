@@ -1,129 +1,180 @@
 # MAAM
 
 <p align="center">
-  <strong>Music Analytics & Asset Management</strong><br>
-  An end-to-end data engineering project for combining YouTube Analytics and BeatStars sales into a unified analytics platform.
+  <img src="docs/maam-logo.png" width="180">
+</p>
+
+<p align="center">
+<strong>Music Analytics & Asset Management</strong><br>
+An end-to-end data engineering platform that unifies YouTube Analytics and BeatStars sales into a single business intelligence solution.
 </p>
 
 ---
 
+# Overview
+
+MAAM (Music Analytics & Asset Management) is an end-to-end data engineering project built to automate the collection, transformation, modeling and visualization of music business data.
+
+The platform combines data from YouTube Analytics and BeatStars into a unified analytical model, allowing music producers to monitor performance, evaluate individual beats and make better business decisions from a single dashboard.
+
+Rather than focusing only on visualization, MAAM emphasizes real-world data engineering concepts including ETL pipelines, dimensional modeling, data quality, cloud orchestration, business rules and cross-platform entity matching.
+
+---
+
+# Dashboard
+
 ## Overview
 
-MAAM is an end-to-end data engineering project built to automate the collection, transformation, modeling and visualization of music business data.
+<p align="center">
+<img src="docs/maam-dashboard.jpg">
+</p>
 
-The project extracts data from multiple sources, cleans and validates it, builds analytical data models in BigQuery, and presents cross-platform insights through an interactive  Studio dashboard.
+The Overview dashboard provides a complete snapshot of the music business.
 
-Rather than focusing only on visualization, MAAM emphasizes data engineering concepts such as ETL pipelines, dimensional modeling, data quality, business rules, and cross-platform entity matching.
+Features include:
+
+- BeatStars Revenue
+- YouTube Revenue
+- Total Sales
+- Total Views
+- Geographic audience distribution
+- Best selling beats
+- Revenue vs Views analysis
 
 ---
 
-## Dashboard
+## Beat Performance
 
-![MAAM Dashboard](docs/maam-dashboard.jpg)
+<p align="center">
+<img src="docs/maam-dashboard2.jpg">
+</p>
+
+Analyze the lifetime performance of an individual beat across platforms.
+
+Features include:
+
+- BeatStars Revenue
+- YouTube Revenue
+- Beat Sales
+- Beat Views
+- Release Date
+- Historical monthly sales
 
 ---
 
-## Features
+# Features
 
+- Automated ETL pipelines
 - YouTube Data API integration
 - YouTube Analytics API integration
 - BeatStars sales ingestion
-- Automated ETL pipeline
 - Bronze / Silver / Gold architecture
-- Star schema data model
+- BigQuery dimensional data warehouse
+- Star schema modeling
+- Historical BeatStars sales tracking
 - Cross-platform beat matching
 - Manual business rules for edge cases
 - Country-level audience analytics
+- Cloud Run Jobs
+- Cloud Scheduler automation
+- Secret Manager integration
 - Interactive Google Data Studio dashboard
 
 ---
 
-## Architecture
+# Architecture
 
 ```
-YouTube Data API        YouTube Analytics API        BeatStars CSV Export
-        │                        │                            │
-        └────────────────────────┴────────────────────────────┘
-                                 │
-                                 ▼
-                        Python ETL Pipeline
-                 Extract → Clean → Validate → Transform
-                                 │
-                                 ▼
-                         Local Silver Parquet
-                                 │
-                                 ▼
-                         Google BigQuery
-                       ┌─────────┴─────────┐
-                       │                   │
-                       ▼                   ▼
-                 Silver Datasets      Gold Datasets
-                                      SQL transformations,
-                                      matching rules and
-                                      analytical models
-                                             │
-                                             ▼
-                                  Google Data Studio Dashboard
+             YouTube Data API
+                    │
+                    │
+        YouTube Analytics API
+                    │
+                    │
+        BeatStars Sales Export
+                    │
+                    ▼
+          Python ETL Pipeline
+     Extract → Transform → Validate
+                    │
+                    ▼
+          Local Silver Parquet
+                    │
+                    ▼
+              Google BigQuery
+        ┌────────────┴────────────┐
+        │                         │
+        ▼                         ▼
+     Silver Layer             Gold Layer
+        │                         │
+        └────────────┬────────────┘
+                     ▼
+          Cloud Run Scheduled Jobs
+                     │
+                     ▼
+          Google Data Studio Dashboard
 ```
 
 ---
 
-## Data Model
+# Data Model
 
-### Silver Layer
+## Silver Layer
 
-- `dim_youtube_video`
-- `fact_youtube_video_metrics`
-- `sales_summary`
-
-### Gold Layer
-
-- `youtube_video_performance`
-- `beatstars_sales_performance`
-- `dim_beat`
-- `cross_platform_beat_performance`
-- `youtube_country_performance`
-- `beatstars_matching_rules`
+- dim_youtube_video
+- fact_youtube_video_metrics
+- sales_summary
 
 ---
 
-## Engineering Challenges
+## Gold Layer
 
-### Cross-platform Matching
+- dashboard_overview
+- youtube_video_performance
+- youtube_country_performance
+- beatstars_sales_performance
+- beatstars_daily_beat_sales
+- beatstars_monthly_beat_sales
+- cross_platform_beat_performance
+- beatstars_matching_rules
+- dim_beat
+
+---
+
+# Engineering Challenges
+
+## Cross-platform Entity Matching
 
 BeatStars products and YouTube videos do not share a common identifier.
 
-MAAM resolves this by combining normalized beat names, business rules and manual matching where necessary.
+MAAM resolves this by combining normalized beat names, deterministic business rules and manual overrides where required.
 
 ---
 
-### Duplicate Product Names
+## Ambiguous Product Names
 
-Different BeatStars products can legitimately share the same product name.
+Different BeatStars products may legitimately share the same product name.
 
-Instead of forcing incorrect joins, MAAM detects ambiguous matches and isolates them until explicit business rules are provided.
-
----
-
-### Manual Matching Rules
-
-Some historical edge cases require deterministic matching.
-
-Examples include:
-
-- Walk My Choppa
-- In My Cup
-
-These are handled through a dedicated `beatstars_matching_rules` layer instead of hardcoded SQL logic.
+Instead of creating incorrect joins, ambiguous matches are isolated until deterministic matching rules become available.
 
 ---
 
-## Technologies
+## Manual Matching Rules
+
+Historical edge cases are handled through a dedicated matching table instead of hardcoded SQL logic.
+
+This approach keeps transformation logic clean while allowing controlled business overrides.
+
+---
+
+# Technologies
 
 - Python
 - Pandas
 - Google BigQuery
-- Google Cloud Platform
+- Google Cloud Run Jobs
+- Google Cloud Scheduler
+- Google Secret Manager
 - YouTube Data API
 - YouTube Analytics API
 - Google Data Studio
@@ -132,7 +183,7 @@ These are handled through a dedicated `beatstars_matching_rules` layer instead o
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```
 src/
@@ -142,40 +193,35 @@ src/
 ├── load/
 │
 main.py
-
 README.md
 ```
 
 ---
 
-## Requirements
+# Requirements
 
 This project uses private YouTube Analytics data, private BeatStars sales exports and a personal Google Cloud project.
 
-The repository is intended to demonstrate the design and implementation of an end-to-end data engineering solution.
+To run the pipeline yourself you will need:
 
-To run the pipeline yourself, you would need:
-
-- Your own Google Cloud project
-- OAuth credentials (`client_secret.json`)
-- YouTube Data API enabled
-- YouTube Analytics API enabled
-- A BeatStars sales export (CSV)
-- A BigQuery dataset
+- Google Cloud Project
+- OAuth Credentials
+- YouTube Data API
+- YouTube Analytics API
+- BeatStars Sales Export
+- BigQuery Dataset
 
 ---
 
-The commands below assume that the required credentials, source data and Google Cloud resources have already been configured.
+# Running the Pipeline
 
-## Running the Pipeline
-
-Activate the virtual environment:
+Activate the virtual environment
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Run the complete ETL pipeline:
+Run the complete ETL pipeline
 
 ```powershell
 python main.py
@@ -183,20 +229,24 @@ python main.py
 
 ---
 
-## Future Improvements
+## Roadmap
 
-Version 2 may include:
+### Version 4 (Planned)
 
-- Spotify integration
-- Instagram integration
-- Time-series analytics
-- Automated reporting
-- AI-generated insights
+- Dynamic Time Intelligence
+  - Last 24 Hours
+  - Last 7 Days
+  - Last 30 Days
+  - Last 90 Days
+  - Lifetime
+
+- Estimated Exclusive Value
+  - Data-driven exclusive pricing based on historical performance
 
 ---
 
-## Version
+Future versions may include additional platform integrations, advanced business intelligence features and AI-assisted analytics.
 
-Current release:
+# Current Version
 
-**MAAM v1.0**
+**MAAM v3.0**

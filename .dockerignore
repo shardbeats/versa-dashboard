@@ -1,25 +1,22 @@
 .venv/
 venv/
+
 __pycache__/
 *.py[cod]
 
-.git/
-.gitignore
-
 .env
 .env.*
+
 token.json
 client_secret.json
 *.key
 *.pem
 
 data/
+
 .vscode/
 .DS_Store
 Thumbs.db
-
-README.md
-docs/
 
 .pytest_cache/
 .mypy_cache/
