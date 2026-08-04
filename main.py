@@ -27,11 +27,13 @@ from src.transform.beatstars import (
 )
 from src.transform.gold import (
     BEATSTARS_DAILY_BEAT_SALES_QUERY,
+    BEATSTARS_MONTHLY_BEAT_SALES_QUERY,
     BEATSTARS_SALES_PERFORMANCE_QUERY,
     CROSS_PLATFORM_BEAT_PERFORMANCE_QUERY,
     DIM_BEAT_QUERY,
     BEATSTARS_MATCHING_RULES_QUERY,
     YOUTUBE_VIDEO_PERFORMANCE_QUERY,
+    DASHBOARD_OVERVIEW_QUERY
 )
 from src.transform.youtube import (
     clean_youtube_metadata,
@@ -252,6 +254,11 @@ def run_beatstars_pipeline():
         BEATSTARS_DAILY_BEAT_SALES_QUERY
     )
 
+    # Build monthly BeatStars sales history.
+    run_bigquery_query(
+        BEATSTARS_MONTHLY_BEAT_SALES_QUERY
+    ) 
+
     # Build the shared Beat dimension.
     run_bigquery_query(
         DIM_BEAT_QUERY
@@ -274,6 +281,11 @@ def run_full_pipeline():
 
     run_youtube_pipeline()
     run_beatstars_pipeline()
+
+    # Build dashboard-level KPI summary.
+    run_bigquery_query(
+        DASHBOARD_OVERVIEW_QUERY
+    )
 
 
 def parse_arguments():

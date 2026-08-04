@@ -18,6 +18,7 @@ SELECT
     f.average_view_percentage,
     f.subscribers_gained,
     f.subscribers_lost,
+    f.estimated_revenue,
     f.snapshot_timestamp
 
 FROM `versa-dashboard.silver.dim_youtube_video` AS d
@@ -248,6 +249,7 @@ SELECT
     y.average_view_percentage,
     y.subscribers_gained,
     y.subscribers_lost,
+    y.estimated_revenue,
 
     bs.quantity,
     bs.gross_amount,
@@ -292,4 +294,63 @@ GROUP BY
     order_date,
     beat_name,
     store_type
+"""
+
+BEATSTARS_MONTHLY_BEAT_SALES_QUERY = """
+CREATE OR REPLACE TABLE
+    `versa-dashboard.gold.beatstars_monthly_beat_sales`
+AS
+
+SELECT
+    DATE_TRUNC(order_date, MONTH) AS order_month,
+
+    beat_name,
+
+    store_type,
+
+    SUM(paid_sales) AS paid_sales,
+
+    SUM(free_sales) AS free_sales,
+
+    SUM(total_units) AS total_units,
+
+    SUM(gross_beat_revenue) AS gross_beat_revenue
+
+FROM `versa-dashboard.gold.beatstars_daily_beat_sales`
+
+GROUP BY
+    order_month,
+    beat_name,
+    store_type
+"""
+
+DASHBOARD_OVERVIEW_QUERY = """
+CREATE OR REPLACE TABLE
+    `versa-dashboard.gold.dashboard_overview`
+AS
+
+SELECT
+    (
+        SELECT
+            SUM(net_revenue)
+        FROM `versa-dashboard.gold.beatstars_sales_performance`
+    ) AS beatstars_revenue,
+
+    (
+        SELECT
+            SUM(estimated_revenue)
+        FROM `versa-dashboard.gold.youtube_video_performance`
+    ) AS youtube_revenue,
+
+    (
+        SELECT
+            SUM(quantity)
+        FROM `versa-dashboard.gold.beatstars_sales_performance`
+    ) AS total_sales,
+
+    (
+        SELECT
+            SUM(views)
+        FROM `versa-dashboard.gold.youtube_video_performance`
+    ) AS total_views
 """

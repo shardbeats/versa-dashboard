@@ -180,6 +180,7 @@ def merge_youtube_analytics(
             "average_view_percentage",
             "subscribers_gained",
             "subscribers_lost",
+            "estimated_revenue",
         ]
     ].copy()
 
@@ -194,6 +195,7 @@ def merge_youtube_analytics(
         "watch_time_minutes",
         "average_view_duration_seconds",
         "average_view_percentage",
+        "estimated_revenue",
     ]
 
     integer_columns = [
@@ -267,6 +269,7 @@ def create_fact_youtube_video_metrics(
             "average_view_percentage",
             "subscribers_gained",
             "subscribers_lost",
+            "estimated_revenue",
         ]
     ].copy()
 

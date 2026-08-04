@@ -135,7 +135,8 @@ def extract_video_analytics(credentials, videos_df):
                     "averageViewDuration,"
                     "averageViewPercentage,"
                     "subscribersGained,"
-                    "subscribersLost"
+                    "subscribersLost,"
+                    "estimatedRevenue"
                 ),
                 sort="-views",
                 maxResults=200,
@@ -153,6 +154,7 @@ def extract_video_analytics(credentials, videos_df):
                     "average_view_percentage": float(row[4]),
                     "subscribers_gained": int(row[5]),
                     "subscribers_lost": int(row[6]),
+                    "estimated_revenue": float(row[7]),
                 }
             )
 
