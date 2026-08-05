@@ -36,3 +36,8 @@ Thumbs.db
 .coverage
 
 docs/maam-dashboard-old.jpg
+
+# dbt generated files
+**/logs/
+**/target/
+**/.user.yml

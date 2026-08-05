@@ -1,4 +1,6 @@
 import argparse
+import subprocess
+from pathlib import Path
 
 from google.cloud import bigquery
 from googleapiclient.discovery import build
@@ -15,25 +17,12 @@ from src.extract.youtube import (
 )
 
 from src.load.beatstars import load_beatstars_sales_to_silver
-from src.load.bigquery import (
-    load_dataframe_to_bigquery,
-    run_bigquery_query,
-)
+from src.load.bigquery import load_dataframe_to_bigquery
 from src.load.youtube import load_youtube_to_silver
 
 from src.transform.beatstars import (
     clean_beatstars_sales,
     validate_beatstars_sales,
-)
-from src.transform.gold import (
-    BEATSTARS_DAILY_BEAT_SALES_QUERY,
-    BEATSTARS_MONTHLY_BEAT_SALES_QUERY,
-    BEATSTARS_SALES_PERFORMANCE_QUERY,
-    CROSS_PLATFORM_BEAT_PERFORMANCE_QUERY,
-    DIM_BEAT_QUERY,
-    BEATSTARS_MATCHING_RULES_QUERY,
-    YOUTUBE_VIDEO_PERFORMANCE_QUERY,
-    DASHBOARD_OVERVIEW_QUERY
 )
 from src.transform.youtube import (
     clean_youtube_metadata,
@@ -47,6 +36,12 @@ from src.transform.youtube import (
 
 PROJECT_ID = "versa-dashboard"
 
+DBT_PROJECT_DIR = (
+    Path(__file__).resolve().parent
+    / "dbt"
+    / "maam"
+)
+
 YOUTUBE_COUNTRY_TABLE_ID = (
     f"{PROJECT_ID}.gold.youtube_country_performance"
 )
@@ -57,6 +52,9 @@ def load_country_performance_to_bigquery(
 ):
     """
     Replace the YouTube country-performance table in BigQuery Gold.
+
+    This table is loaded directly because it currently comes from a
+    standalone API response rather than a BigQuery Silver source.
     """
 
     client = bigquery.Client(
@@ -83,10 +81,56 @@ def load_country_performance_to_bigquery(
     )
 
 
+def run_dbt_build():
+    """
+    Build and test the complete dbt Gold layer.
+    """
+
+    print(
+        "\n========== MAAM DBT BUILD STARTED ==========\n"
+    )
+
+    if not DBT_PROJECT_DIR.exists():
+        raise FileNotFoundError(
+            "dbt project directory was not found: "
+            f"{DBT_PROJECT_DIR}"
+        )
+
+    try:
+        subprocess.run(
+            [
+        "dbt",
+        "build",
+        "--project-dir",
+        "dbt/maam",
+        "--profiles-dir",
+        "dbt/maam",
+            ],
+    check=True,
+        )
+
+    except FileNotFoundError as error:
+        raise RuntimeError(
+            "The dbt executable could not be found. "
+            "Make sure the virtual environment is active "
+            "and dbt-bigquery is installed."
+        ) from error
+
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            "dbt build failed. Check the dbt output above "
+            "for the failing model or test."
+        ) from error
+
+    print(
+        "\n========== MAAM DBT BUILD COMPLETED ==========\n"
+    )
+
+
 def run_youtube_pipeline():
     """
-    Run the complete YouTube pipeline:
-    Extract -> Transform -> Validate -> Silver -> BigQuery -> Gold
+    Run the YouTube pipeline:
+    Extract -> Transform -> Validate -> Silver -> BigQuery Silver
     """
 
     credentials = authenticate()
@@ -196,20 +240,15 @@ def run_youtube_pipeline():
         ),
     )
 
-    # Build YouTube Gold.
-    run_bigquery_query(
-        YOUTUBE_VIDEO_PERFORMANCE_QUERY
-    )
-
     print(
-        "\nYouTube pipeline completed successfully."
+        "\nYouTube Silver pipeline completed successfully."
     )
 
 
 def run_beatstars_pipeline():
     """
-    Run the complete BeatStars pipeline:
-    Extract -> Transform -> Validate -> Silver -> BigQuery -> Gold
+    Run the BeatStars pipeline:
+    Extract -> Transform -> Validate -> Silver -> BigQuery Silver
     """
 
     # Extract raw BeatStars CSV data.
@@ -239,53 +278,18 @@ def run_beatstars_pipeline():
         ),
     )
 
-    # Create manual BeatStars overrides.
-    run_bigquery_query(
-        BEATSTARS_MATCHING_RULES_QUERY
-    )
-
-    # Build BeatStars Gold.
-    run_bigquery_query(
-        BEATSTARS_SALES_PERFORMANCE_QUERY
-    )
-
-    # Build daily BeatStars sales history.
-    run_bigquery_query(
-        BEATSTARS_DAILY_BEAT_SALES_QUERY
-    )
-
-    # Build monthly BeatStars sales history.
-    run_bigquery_query(
-        BEATSTARS_MONTHLY_BEAT_SALES_QUERY
-    ) 
-
-    # Build the shared Beat dimension.
-    run_bigquery_query(
-        DIM_BEAT_QUERY
-    )
-
-    # Build cross-platform Gold.
-    run_bigquery_query(
-        CROSS_PLATFORM_BEAT_PERFORMANCE_QUERY
-    )
-
     print(
-        "\nBeatStars pipeline completed successfully."
+        "\nBeatStars Silver pipeline completed successfully."
     )
 
 
 def run_full_pipeline():
     """
-    Run both the YouTube and BeatStars pipelines.
+    Run both source pipelines before dbt builds Gold.
     """
 
     run_youtube_pipeline()
     run_beatstars_pipeline()
-
-    # Build dashboard-level KPI summary.
-    run_bigquery_query(
-        DASHBOARD_OVERVIEW_QUERY
-    )
 
 
 def parse_arguments():
@@ -332,6 +336,9 @@ def main():
 
     else:
         run_full_pipeline()
+
+    # Build and test the complete Gold layer after Silver is ready.
+    run_dbt_build()
 
     print(
         f"\n========== MAAM {args.pipeline.upper()} "

@@ -1,0 +1,14 @@
+maam:
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: versa-dashboard
+      dataset: gold
+      location: EU
+      threads: 4
+      priority: interactive
+      job_retries: 1
+      job_execution_timeout_seconds: 300
+
+  target: dev

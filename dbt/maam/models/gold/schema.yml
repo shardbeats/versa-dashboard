@@ -6,3 +6,82 @@ sources:
     schema: silver
     tables:
       - name: fact_beat_sales
+      - name: dim_youtube_video
+      - name: fact_youtube_video_metrics
+      - name: sales_summary
+
+models:
+  - name: beatstars_daily_beat_sales
+    description: Daily BeatStars sales aggregated per beat and store type.
+
+  - name: beatstars_monthly_beat_sales
+    description: Monthly aggregation of BeatStars sales per beat and store type.
+
+  - name: youtube_video_performance
+    description: Current YouTube performance metrics for every uploaded beat.
+
+    columns:
+      - name: video_id
+        description: Unique YouTube video identifier.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: views
+        description: Current lifetime view count.
+        data_tests:
+          - not_null
+
+      - name: estimated_revenue
+        description: Estimated lifetime YouTube revenue.
+        data_tests:
+          - not_null
+
+  - name: beatstars_sales_performance
+    description: Cleaned and merged BeatStars sales after applying manual matching rules.
+
+  - name: dim_beat
+    description: Canonical beat dimension linking YouTube videos with BeatStars products.
+
+    columns:
+      - name: beat_key
+        description: Unique identifier for the beat, based on the YouTube video ID.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: beat_name
+        description: Normalized beat name.
+        data_tests:
+          - not_null
+
+      - name: match_status
+        description: Cross-platform matching status for the beat.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - exact
+                  - manual
+                  - unmatched
+                  - ambiguous
+
+  - name: cross_platform_beat_performance
+    description: Unified cross-platform performance combining YouTube metrics and BeatStars sales.
+
+    columns:
+      - name: beat_key
+        data_tests:
+          - unique
+          - not_null
+
+      - name: match_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - exact
+                  - manual
+
+  - name: dashboard_overview
+    description: One-row summary containing key metrics for the dashboard.
