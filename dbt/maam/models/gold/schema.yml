@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: silver
+    database: versa-dashboard
+    schema: silver
+    tables:
+      - name: fact_beat_sales
