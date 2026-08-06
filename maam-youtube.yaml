@@ -1,0 +1,45 @@
+﻿apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  annotations:
+    run.googleapis.com/creator: businessghostb@gmail.com
+    run.googleapis.com/lastModifier: businessghostb@gmail.com
+  labels:
+    cloud.googleapis.com/location: europe-north2
+    run.googleapis.com/lastUpdatedTime: '2026-08-06T12:48:28.327024Z'
+  name: maam-youtube
+  namespace: '737854461350'
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 578.0.0
+        run.googleapis.com/execution-environment: gen2
+      labels:
+        client.knative.dev/nonce: muv_not_ful
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          containers:
+          - args:
+            - main.py 
+            - youtube
+            command:
+            - python
+            env:
+            - name: YOUTUBE_TOKEN_JSON
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: youtube-token
+            image: europe-north2-docker.pkg.dev/versa-dashboard/maam/maam-youtube:dbt
+            name: maam-1
+            resources:
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+          maxRetries: 1
+          serviceAccountName: maam-pipeline@versa-dashboard.iam.gserviceaccount.com
+          timeoutSeconds: '600'
