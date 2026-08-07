@@ -160,7 +160,42 @@ final AS (
 
     FROM scored
 
+),
+
+priced AS (
+
+    SELECT
+        *,
+
+        ROUND(
+            300
+            + 4200 * POW(overall_score / 100, 4)
+            + 11000 * POW(overall_score / 100, 20),
+            0
+        ) AS target_price
+
+    FROM final
+
+),
+
+ranged AS (
+
+    SELECT
+        *,
+
+        GREATEST(
+            300,
+            FLOOR((target_price * 0.85) / 50) * 50
+        ) AS price_min,
+
+        GREATEST(
+            350,
+            CEIL((target_price * 1.15) / 50) * 50
+        ) AS price_max
+
+    FROM priced
+
 )
 
 SELECT *
-FROM final
+FROM ranged
