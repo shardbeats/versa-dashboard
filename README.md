@@ -121,43 +121,43 @@ The Estimated Exclusive Value model uses historical sales performance to generat
 # Architecture
 
 ```text
-        YouTube Data API
-                │
-        YouTube Analytics API
-                │
-        BeatStars Sales Export
-                │
-                ▼
-        Python ETL Pipeline
-   Extract → Transform → Validate
-                │
-        ┌───────┴────────┐
-        │                │
-        ▼                ▼
- Local Silver       BigQuery Silver
-   Parquet                │
-                          ▼
-                         dbt
-                Transform → Model → Test
-                          │
-                          ▼
-                    BigQuery Gold
-                          │
-                          ▼
-              Google Data Studio
-                     Dashboard
+                         YouTube Data API
+                                │
+                         YouTube Analytics API
+                                │
+                         BeatStars Sales Export
+                                │
+                                ▼
+                         Python ETL Pipeline
+                    Extract → Transform → Validate
+                                │
+                         ┌──────┴──────┐
+                         │             │
+                         ▼             ▼
+                    Local Silver   BigQuery Silver
+                      Parquet           │
+                                        ▼
+                                       dbt
+                              Transform → Model → Test
+                                        │
+                                        ▼
+                                  BigQuery Gold
+                                        │
+                                        ▼
+                              Google Data Studio
+                                   Dashboard
 
 
-Pipeline execution
-────────────────────────────────────
+                    Pipeline execution
+                    ──────────────────
 
-       Docker Container
-              │
-              ▼
-       Cloud Run Job
-              │
-              ▼
-      Cloud Scheduler
+                     Docker Container
+                            │
+                            ▼
+                      Cloud Run Job
+                            │
+                            ▼
+                     Cloud Scheduler
 ```
 
 The Python pipeline is responsible for source extraction, cleaning, validation and Silver-layer loading.
