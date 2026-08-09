@@ -17,7 +17,10 @@ from src.extract.youtube import (
 )
 
 from src.load.beatstars import load_beatstars_sales_to_silver
-from src.load.bigquery import load_dataframe_to_bigquery
+from src.load.bigquery import (
+    load_dataframe_to_bigquery,
+    load_daily_snapshot_to_bigquery,
+)
 from src.load.youtube import load_youtube_to_silver
 
 from src.transform.beatstars import (
@@ -231,13 +234,10 @@ def run_youtube_pipeline():
         ),
     )
 
-    # Load YouTube metrics to BigQuery Silver.
-    load_dataframe_to_bigquery(
+    # Load YouTube metrics as a daily historical snapshot.
+    load_daily_snapshot_to_bigquery(
         dataframe=fact_youtube_video_metrics,
         table_name="fact_youtube_video_metrics",
-        write_disposition=(
-            bigquery.WriteDisposition.WRITE_TRUNCATE
-        ),
     )
 
     print(

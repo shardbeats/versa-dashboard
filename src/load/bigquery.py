@@ -84,3 +84,71 @@ def run_bigquery_query(query: str) -> None:
     query_job.result()
 
     print("\nBigQuery query completed successfully.")
+
+def load_daily_snapshot_to_bigquery(
+    dataframe: pd.DataFrame,
+    table_name: str,
+    snapshot_column: str = "snapshot_timestamp",
+) -> None:
+    """
+    Load one daily snapshot into a BigQuery table.
+
+    If a snapshot for the same UTC date already exists,
+    delete it before appending the new snapshot.
+    """
+
+    client = get_bigquery_client()
+
+    table_id = (
+        f"{PROJECT_ID}."
+        f"{DATASET_ID}."
+        f"{table_name}"
+    )
+
+    snapshot_date = pd.to_datetime(
+        dataframe[snapshot_column],
+        utc=True,
+    ).dt.date.iloc[0]
+
+    delete_query = f"""
+        DELETE FROM `{table_id}`
+        WHERE DATE({snapshot_column}) = @snapshot_date
+    """
+
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter(
+                "snapshot_date",
+                "DATE",
+                snapshot_date,
+            )
+        ]
+    )
+
+    delete_job = client.query(
+        delete_query,
+        job_config=job_config,
+        location=LOCATION,
+    )
+
+    delete_job.result()
+
+    load_job_config = bigquery.LoadJobConfig(
+        write_disposition=(
+            bigquery.WriteDisposition.WRITE_APPEND
+        ),
+    )
+
+    load_job = client.load_table_from_dataframe(
+        dataframe,
+        table_id,
+        job_config=load_job_config,
+        location=LOCATION,
+    )
+
+    load_job.result()
+
+    print(
+        f"\nLoaded daily snapshot for {snapshot_date} "
+        f"to {table_id}"
+    )

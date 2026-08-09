@@ -21,6 +21,7 @@ token.json
 data/
 *.parquet
 *.csv
+!dbt/maam/seeds/beatstars_matching_rules.csv
 
 # VS Code
 .vscode/
@@ -36,6 +37,8 @@ Thumbs.db
 .coverage
 
 docs/maam-dashboard-old.jpg
+maam-dashboard2.jpg
+
 
 # dbt generated files
 **/logs/
