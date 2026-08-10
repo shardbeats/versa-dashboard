@@ -74,3 +74,9 @@ jobs:
       - name: Push Docker image
         run: |
           docker push europe-north2-docker.pkg.dev/versa-dashboard/maam/maam-youtube:${{ github.sha }}
+
+                - name: Deploy to Cloud Run
+        run: |
+          gcloud run jobs update maam-youtube \
+            --image=europe-north2-docker.pkg.dev/versa-dashboard/maam/maam-youtube:${{ github.sha }} \
+            --region=europe-north2
