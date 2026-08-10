@@ -1,0 +1,36 @@
+name: MAAM CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+        steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m compileall main.py src pipelines
+
+      - name: Validate dbt project
+        working-directory: dbt/maam
+        run: dbt parse
+
+      - name: Build Docker image
+        run: docker build -t maam-ci .
+
