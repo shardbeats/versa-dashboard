@@ -1,5 +1,9 @@
 name: MAAM CI
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
   push:
     branches:
@@ -16,9 +20,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: "projects/737854461350/locations/global/workloadIdentityPools/maam-github/providers/github"
+          service_account: "maam-github-cd@versa-dashboard.iam.gserviceaccount.com"
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Verify Google Cloud authentication
+        run: gcloud auth list
+      
       - name: Set up Python
         uses: actions/setup-python@v6
-        with:
+          with:
           python-version: "3.12"
 
       - name: Install dependencies
