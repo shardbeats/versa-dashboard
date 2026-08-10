@@ -348,6 +348,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    if True
-    print("CI should catch this")
