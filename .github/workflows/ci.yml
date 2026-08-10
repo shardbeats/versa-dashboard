@@ -13,6 +13,9 @@ on:
       - main
 
 jobs:
+  # -------------------------
+  # CI - Verify MAAM
+  # -------------------------
   ci:
     runs-on: ubuntu-latest
 
@@ -20,18 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: "projects/737854461350/locations/global/workloadIdentityPools/maam-github/providers/github"
-          service_account: "maam-github-cd@versa-dashboard.iam.gserviceaccount.com"
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
-
-      - name: Verify Google Cloud authentication
-        run: gcloud auth list
-      
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -49,3 +40,37 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t maam-ci .
+
+  # -------------------------
+  # CD - Build and push image
+  # -------------------------
+  deploy:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: "projects/737854461350/locations/global/workloadIdentityPools/maam-github/providers/github"
+          service_account: "maam-github-cd@versa-dashboard.iam.gserviceaccount.com"
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-north2-docker.pkg.dev --quiet
+
+      - name: Build production Docker image
+        run: |
+          docker build \
+            -t europe-north2-docker.pkg.dev/versa-dashboard/maam/maam-youtube:${{ github.sha }} \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push europe-north2-docker.pkg.dev/versa-dashboard/maam/maam-youtube:${{ github.sha }}
