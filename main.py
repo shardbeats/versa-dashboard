@@ -2,6 +2,12 @@ import argparse
 import subprocess
 from pathlib import Path
 
+from src.extract.beatstars_email import (
+    extract_beatstars_sales as extract_beatstars_email_sales,
+)
+from src.load.beatstars_email import load_beatstars_email_sales
+
+
 from google.cloud import bigquery
 from googleapiclient.discovery import build
 
@@ -129,6 +135,54 @@ def run_dbt_build():
         "\n========== MAAM DBT BUILD COMPLETED ==========\n"
     )
 
+def run_dbt_model(model_name):
+    """
+    Build a specific dbt model.
+    """
+
+    print(
+        f"\n========== MAAM DBT MODEL STARTED: "
+        f"{model_name} ==========\n"
+    )
+
+    if not DBT_PROJECT_DIR.exists():
+        raise FileNotFoundError(
+            "dbt project directory was not found: "
+            f"{DBT_PROJECT_DIR}"
+        )
+
+    try:
+        subprocess.run(
+            [
+                "dbt",
+                "run",
+                "--select",
+                model_name,
+                "--project-dir",
+                "dbt/maam",
+                "--profiles-dir",
+                "dbt/maam",
+            ],
+            check=True,
+        )
+
+    except FileNotFoundError as error:
+        raise RuntimeError(
+            "The dbt executable could not be found. "
+            "Make sure the virtual environment is active "
+            "and dbt-bigquery is installed."
+        ) from error
+
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"dbt run failed for model '{model_name}'. "
+            "Check the dbt output above."
+        ) from error
+
+    print(
+        f"\n========== MAAM DBT MODEL COMPLETED: "
+        f"{model_name} ==========\n"
+    )
 
 def run_youtube_pipeline():
     """
@@ -282,6 +336,33 @@ def run_beatstars_pipeline():
         "\nBeatStars Silver pipeline completed successfully."
     )
 
+def run_beatstars_email_pipeline():
+    """
+    Run the fresh BeatStars sales pipeline:
+
+    Gmail -> Parse -> BigQuery staging -> Home dbt model
+    """
+
+    sales = extract_beatstars_email_sales(
+         max_results=50,
+    )
+
+    print(
+        f"Found {len(sales)} recent BeatStars sale emails."
+    )
+
+    loaded_rows = load_beatstars_email_sales(
+        sales
+    )
+
+    print(
+        f"Loaded {loaded_rows} new BeatStars sale item rows."
+    )
+
+    # Refresh the Home metrics using the unified sales view.
+    run_dbt_model(
+        "homepage_time_intelligence"
+    )
 
 def run_full_pipeline():
     """
@@ -308,11 +389,12 @@ def parse_arguments():
         choices=[
             "youtube",
             "beatstars",
+            "beatstars_email",
             "full",
         ],
         help=(
             "Pipeline to run: "
-            "youtube, beatstars or full. "
+            "youtube, beatstars, beatstars_email or full. "
             "Defaults to full."
         ),
     )
@@ -334,11 +416,16 @@ def main():
     elif args.pipeline == "beatstars":
         run_beatstars_pipeline()
 
+    elif args.pipeline == "beatstars_email":
+        run_beatstars_email_pipeline()
+
     else:
         run_full_pipeline()
 
-    # Build and test the complete Gold layer after Silver is ready.
-    run_dbt_build()
+    # Build the complete Gold layer for the regular pipelines.
+    # The BeatStars email pipeline refreshes only the Home model itself.
+    if args.pipeline != "beatstars_email":
+          run_dbt_build()
 
     print(
         f"\n========== MAAM {args.pipeline.upper()} "

@@ -9,7 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 SCOPES = [
     "https://www.googleapis.com/auth/yt-analytics.readonly",
     "https://www.googleapis.com/auth/youtube.readonly",
-     "https://www.googleapis.com/auth/yt-analytics-monetary.readonly",
+    "https://www.googleapis.com/auth/yt-analytics-monetary.readonly",
 ]
 
 TOKEN_ENV_VAR = "YOUTUBE_TOKEN_JSON"
@@ -73,7 +73,11 @@ def authenticate() -> Credentials:
     # Only persist credentials locally.
     # Cloud Run containers are temporary and use Secret Manager instead.
     if not using_cloud_token:
-        with open(LOCAL_TOKEN_PATH, "w", encoding="utf-8") as token_file:
+        with open(
+            LOCAL_TOKEN_PATH,
+            "w",
+            encoding="utf-8",
+        ) as token_file:
             token_file.write(creds.to_json())
 
     return creds
