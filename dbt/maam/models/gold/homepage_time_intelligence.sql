@@ -38,7 +38,7 @@ beatstars AS (
 
     FROM periods AS p
 
-    CROSS JOIN {{ source('silver', 'fact_beat_sales') }} AS s
+    CROSS JOIN {{ source('silver', 'fact_beat_sales_unified') }} AS s
 
     GROUP BY
         p.period_name,

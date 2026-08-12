@@ -6,6 +6,7 @@ sources:
     schema: silver
     tables:
       - name: fact_beat_sales
+      - name: fact_beat_sales_unified
       - name: dim_youtube_video
       - name: fact_youtube_video_metrics
       - name: sales_summary

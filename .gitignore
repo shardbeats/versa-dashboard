@@ -12,6 +12,8 @@ token.json
 *.key
 *.pem
 *.json.bak
+gmail_token.json
+beatstars_email_test.html
 
 # Environment variables
 .env
