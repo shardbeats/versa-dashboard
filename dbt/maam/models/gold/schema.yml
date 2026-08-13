@@ -10,6 +10,7 @@ sources:
       - name: dim_youtube_video
       - name: fact_youtube_video_metrics
       - name: sales_summary
+      - name: stg_beatstars_email_sales
 
 models:
   - name: beatstars_daily_beat_sales
@@ -18,6 +19,25 @@ models:
   - name: beatstars_monthly_beat_sales
     description: Monthly aggregation of BeatStars sales per beat and store type.
 
+  - name: latest_beatstars_sales
+    columns:
+      - name: invoice_number
+        data_tests:
+          - not_null
+          - unique
+
+      - name: sold_at
+        data_tests:
+          - not_null
+
+      - name: source
+        data_tests:
+          - not_null
+
+      - name: order_total
+        data_tests:
+          - not_null
+  
   - name: youtube_video_performance
     description: Current YouTube performance metrics for every uploaded beat.
 
@@ -86,3 +106,5 @@ models:
 
   - name: dashboard_overview
     description: One-row summary containing key metrics for the dashboard.
+
+  
