@@ -12,7 +12,22 @@ MAAM (Music Analytics & Asset Management) is an end-to-end data engineering and 
 
 The platform combines data from YouTube Analytics and BeatStars into a unified analytical model, allowing music producers to monitor business performance, evaluate individual beats, analyze historical trends and make data-driven pricing decisions from a single dashboard.
 
-Rather than focusing only on visualization, MAAM emphasizes real-world data engineering concepts including ETL pipelines, dimensional modeling, data quality testing, cloud orchestration, historical snapshots, transformation with dbt, business rules and cross-platform entity matching.
+Rather than focusing only on visualization, MAAM emphasizes real-world data engineering concepts including ETL pipelines, dimensional modeling, data quality testing, cloud orchestration, historical snapshots, transformation with dbt, business rules, cross-platform entity matching and automated deployment.
+
+---
+
+# What's New in v5.0
+
+MAAM v5.0 focuses on production automation, fresher sales ingestion and independently scheduled data workloads.
+
+Key additions include:
+
+- CI/CD with GitHub Actions for automated validation and deployment
+- Gmail API ingestion for fresh BeatStars sales from Marketplace and Pro Page
+- Independent Cloud Run Jobs with workload-specific schedules
+- Latest Sales dashboard feature showing the five most recent BeatStars orders
+
+These changes allow MAAM to process different workloads according to their individual freshness requirements instead of relying entirely on a single production schedule.
 
 ---
 
@@ -23,7 +38,7 @@ MAAM contains three dashboard views designed for different levels of analysis.
 ## Home
 
 <p align="center">
-  <img src="docs/maam-dashboard-homev4.jpg">
+  <img src="docs/maam-dashboard-homev5.jpg">
 </p>
 
 The Home dashboard provides a quick overview of recent business and channel performance.
@@ -44,7 +59,11 @@ Key metrics include:
 - Beats Published
 - YouTube Views
 - Subscribers Gained
-- Watch Time
+- Watch Time (min)
+
+The Home dashboard also includes a Latest Sales view showing the five most recent BeatStars orders, including beat, license type, sales channel, relative purchase time and order value.
+
+Multi-item and promotional orders are grouped at the order level so that a single transaction is represented as one sale rather than multiple individual line items.
 
 ---
 
@@ -97,7 +116,9 @@ The Estimated Exclusive Value model uses historical sales performance to generat
 - Automated ETL pipelines
 - YouTube Data API integration
 - YouTube Analytics API integration
-- BeatStars sales ingestion
+- BeatStars sales export ingestion
+- Gmail API sales ingestion
+- Marketplace and Pro Page sales ingestion
 - Bronze / Silver / Gold architecture
 - BigQuery dimensional data warehouse
 - dbt transformation layer
@@ -106,14 +127,18 @@ The Estimated Exclusive Value model uses historical sales performance to generat
 - Historical YouTube metric snapshots
 - Historical BeatStars sales tracking
 - Dynamic time intelligence
+- Latest BeatStars sales tracking
+- Order-level multi-item sales modeling
 - Cross-platform beat matching
 - Manual business rules for edge cases
 - Estimated Exclusive Value modeling
 - Country-level audience analytics
-- Cloud Run Jobs
-- Cloud Scheduler automation
+- Independent Cloud Run Jobs
+- Workload-specific Cloud Scheduler automation
 - Secret Manager integration
 - Docker containerization
+- GitHub Actions CI/CD
+- Automated container build and deployment
 - Interactive Google Data Studio dashboard
 
 ---
@@ -125,46 +150,82 @@ The Estimated Exclusive Value model uses historical sales performance to generat
                                 │
                          YouTube Analytics API
                                 │
-                         BeatStars Sales Export
+                                ▼
+                         YouTube Pipeline
+                                │
+                                │
+BeatStars Sales Export ──► BeatStars Pipeline
+                                │
+                                │
+BeatStars Sales Emails ──► Gmail API
                                 │
                                 ▼
-                         Python ETL Pipeline
-                    Extract → Transform → Validate
+                     BeatStars Email Pipeline
                                 │
-                         ┌──────┴──────┐
-                         │             │
-                         ▼             ▼
-                    Local Silver   BigQuery Silver
-                      Parquet           │
-                                        ▼
-                                       dbt
-                              Transform → Model → Test
-                                        │
-                                        ▼
-                                  BigQuery Gold
-                                        │
-                                        ▼
-                              Google Data Studio
-                                   Dashboard
+                                ▼
+                         BigQuery Silver
+                                │
+                                ▼
+                               dbt
+                     Transform → Model → Test
+                                │
+                                ▼
+                          BigQuery Gold
+                                │
+                                ▼
+                      Google Data Studio
+                           Dashboard
 
 
-                    Pipeline execution
-                    ──────────────────
+Production workloads
+────────────────────
 
-                     Docker Container
-                            │
-                            ▼
-                      Cloud Run Job
-                            │
-                            ▼
-                     Cloud Scheduler
+Main Pipeline
+    │
+    └── Cloud Run Job
+            │
+            └── Cloud Scheduler
+                    └── Daily production refresh
+
+
+BeatStars Email Pipeline
+    │
+    └── Cloud Run Job
+            │
+            └── Cloud Scheduler
+                    ├── 08:00
+                    └── 20:00
+
+
+Deployment
+──────────
+
+GitHub
+   │
+   ▼
+GitHub Actions
+   │
+   ├── CI
+   │
+   ▼
+Docker Build
+   │
+   ▼
+Artifact Registry
+   │
+   ▼
+Cloud Run Jobs
 ```
 
-The Python pipeline is responsible for source extraction, cleaning, validation and Silver-layer loading.
+The Python pipelines are responsible for source extraction, cleaning, validation and Silver-layer loading.
 
-dbt handles analytical transformations, business logic, dimensional modeling and data quality testing in the Gold layer.
+YouTube and the primary BeatStars pipeline provide the core analytical datasets, while the Gmail-based BeatStars pipeline independently ingests recent sales notifications.
 
-The production pipeline runs inside a Docker container using Google Cloud Run Jobs and is automatically triggered through Cloud Scheduler.
+dbt handles analytical transformations, business logic, dimensional modeling, sales reconciliation and data quality testing in the Gold layer.
+
+Production workloads run as containerized Google Cloud Run Jobs and are triggered independently through Cloud Scheduler according to their freshness requirements.
+
+Changes pushed to GitHub are validated and deployed through a GitHub Actions CI/CD workflow.
 
 ---
 
@@ -195,7 +256,13 @@ Historical snapshots of cumulative YouTube performance metrics including:
 
 ### sales_summary
 
-Cleaned BeatStars transaction-level sales data used as the source for downstream dbt models.
+Cleaned BeatStars transaction-level sales data from the primary sales export, used as a source for downstream dbt models.
+
+### stg_beatstars_email_sales
+
+Cleaned BeatStars sales captured from Gmail notifications.
+
+The email ingestion path provides fresher transaction data between primary BeatStars sales export refreshes and supports both Marketplace and Pro Page transactions.
 
 ---
 
@@ -241,10 +308,11 @@ The dbt layer is responsible for:
 - Cross-platform modeling
 - Dimensional modeling
 - Time intelligence
+- Sales reconciliation
 - Data quality testing
 - Reusable business rules
 
-The complete dbt project is built and tested automatically after the Silver pipelines complete.
+The required dbt models are built and tested after their corresponding Silver pipelines complete.
 
 ```text
 BigQuery Silver
@@ -255,6 +323,7 @@ BigQuery Silver
       ├── Transform
       ├── Model
       ├── Apply business rules
+      ├── Reconcile sales sources
       └── Test
       │
       ▼
@@ -278,6 +347,9 @@ Current models include:
 - cross_platform_beat_performance
 - dim_beat
 - homepage_time_intelligence
+- latest_beatstars_sales
+
+The Latest Sales model groups transaction items at the order level and exposes the five most recent BeatStars orders for the Home dashboard.
 
 ---
 
@@ -315,7 +387,27 @@ Metrics include:
 - Beats Published
 - YouTube Views
 - Subscribers Gained
-- Watch Time
+- Watch Time (min)
+
+---
+
+# Latest Sales
+
+MAAM v5.0 introduces a dedicated Latest Sales model and dashboard component.
+
+BeatStars sales notifications are ingested through the Gmail API and processed independently from the primary production refresh.
+
+The dashboard displays the five most recent orders with:
+
+- Beat
+- License
+- Purchase time
+- Marketplace or Pro Page source
+- Order value
+
+Multi-item purchases such as promotional deals are modeled at the order level. This prevents a transaction containing multiple beats from appearing as multiple separate sales in the Latest Sales view.
+
+The underlying model retains the individual items belonging to each transaction while exposing a compact order-level representation to the dashboard.
 
 ---
 
@@ -383,9 +475,31 @@ MAAM therefore replaces an existing snapshot for the current UTC date before loa
 
 YouTube and BeatStars provide data in fundamentally different ways.
 
-YouTube metrics are retrieved through APIs and contain cumulative values, while BeatStars sales are ingested from transaction exports containing historical order dates.
+YouTube metrics are retrieved through APIs and contain cumulative values, while BeatStars sales are available as historical transaction data and individual sales notifications.
 
 The Gold layer abstracts these differences and exposes consistent analytical metrics to the dashboard.
+
+---
+
+## Sales Freshness and Reconciliation
+
+The primary BeatStars sales dataset provides historical transaction data but does not provide the same freshness required by features such as Latest Sales.
+
+MAAM v5.0 introduces an independent Gmail ingestion pipeline that captures BeatStars transaction notifications and makes recent Marketplace and Pro Page sales available without waiting for the primary sales refresh.
+
+Because the same transaction may later exist in both sources, MAAM reconciles sales using transaction identifiers to prevent the same order from being counted twice.
+
+This allows fresh email-derived transactions to temporarily fill the gap while preserving the primary sales dataset as part of the historical pipeline.
+
+---
+
+## Workload-Specific Scheduling
+
+Not every source requires the same refresh frequency.
+
+Instead of increasing the frequency of the complete MAAM pipeline, v5.0 separates the BeatStars email workload into its own Cloud Run Job.
+
+This allows recent sales to be refreshed independently while avoiding unnecessary execution of YouTube extraction and unrelated transformations.
 
 ---
 
@@ -404,8 +518,40 @@ Examples include:
 - Data type validation
 - Model-level dbt tests
 - Referential and business-rule validation
+- Order-level uniqueness validation
 
-A failed dbt build causes the production pipeline to fail rather than publishing an invalid analytical layer.
+A failed dbt build causes the corresponding production pipeline to fail rather than publishing an invalid analytical layer.
+
+---
+
+# CI/CD
+
+MAAM v5.0 introduces a GitHub Actions CI/CD workflow.
+
+Changes pushed to the main branch pass through automated validation before deployment.
+
+```text
+Code Change
+    │
+    ▼
+Git Push
+    │
+    ▼
+GitHub Actions
+    │
+    ├── CI / Validation
+    │
+    ▼
+Container Build
+    │
+    ▼
+Artifact Registry
+    │
+    ▼
+Cloud Run Deployment
+```
+
+This reduces manual deployment steps and keeps the production Cloud Run Jobs aligned with the version-controlled codebase.
 
 ---
 
@@ -420,10 +566,12 @@ A failed dbt build causes the production pipeline to fail rather than publishing
 - Google Cloud Scheduler
 - Google Secret Manager
 - Google Cloud Build
-- Artifact Registry
+- Google Artifact Registry
 - Docker
+- GitHub Actions
 - YouTube Data API
 - YouTube Analytics API
+- Gmail API
 - Google Data Studio
 - Git
 - GitHub
@@ -435,17 +583,27 @@ A failed dbt build causes the production pipeline to fail rather than publishing
 ```text
 versa-dashboard/
 │
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
 ├── src/
+│   ├── auth.py
+│   ├── auth_gmail.py
+│   │
 │   ├── extract/
 │   │   ├── beatstars.py
+│   │   ├── beatstars_email.py
 │   │   └── youtube.py
 │   │
 │   ├── transform/
 │   │   ├── beatstars.py
+│   │   ├── beatstars_email.py
 │   │   └── youtube.py
 │   │
 │   └── load/
 │       ├── beatstars.py
+│       ├── beatstars_email.py
 │       ├── bigquery.py
 │       └── youtube.py
 │
@@ -453,6 +611,7 @@ versa-dashboard/
 │   └── maam/
 │       ├── models/
 │       │   └── gold/
+│       │       └── latest_beatstars_sales.sql
 │       │
 │       ├── seeds/
 │       │   └── beatstars_matching_rules.csv
@@ -470,7 +629,7 @@ versa-dashboard/
 
 # Pipeline Execution
 
-MAAM supports individual source pipelines as well as the complete production pipeline.
+MAAM supports individual source workloads as well as the complete production pipeline.
 
 Activate the virtual environment:
 
@@ -490,21 +649,43 @@ Run only the YouTube pipeline:
 python main.py youtube
 ```
 
-Run only the BeatStars pipeline:
+Run only the primary BeatStars pipeline:
 
 ```powershell
 python main.py beatstars
 ```
 
-After the selected Silver pipeline completes, MAAM automatically executes the dbt build for the Gold layer.
+Run the BeatStars Gmail ingestion pipeline:
 
-The production YouTube pipeline is containerized with Docker and executed through Google Cloud Run Jobs.
+```powershell
+python main.py beatstars_email
+```
+
+The production workloads are containerized with Docker and executed through Google Cloud Run Jobs.
+
+The primary production refresh and BeatStars email ingestion run independently, allowing each workload to use a schedule appropriate to its data freshness requirements.
+
+---
+
+# Production Scheduling
+
+MAAM v5.0 uses separate production schedules for different workloads.
+
+```text
+08:00  → BeatStars Email Pipeline
+19:00  → Main Production Pipeline
+20:00  → BeatStars Email Pipeline
+```
+
+The BeatStars email pipeline can therefore refresh recent sales without unnecessarily executing the complete MAAM pipeline.
+
+Schedules are managed through Google Cloud Scheduler and trigger the corresponding Cloud Run Jobs.
 
 ---
 
 # Requirements
 
-This project uses private YouTube Analytics data, private BeatStars sales exports and a personal Google Cloud project.
+This project uses private YouTube Analytics data, private BeatStars sales data, Gmail-based sales notifications and a personal Google Cloud project.
 
 To run the complete project independently you will need:
 
@@ -512,11 +693,12 @@ To run the complete project independently you will need:
 - OAuth Credentials
 - YouTube Data API
 - YouTube Analytics API
+- Gmail API
 - BeatStars Sales Export
 - BigQuery datasets
 - dbt-bigquery
 
-Sensitive credentials and private source data are excluded from version control.
+Sensitive credentials, OAuth tokens, customer information and private source data are excluded from version control.
 
 ---
 
@@ -544,4 +726,4 @@ The long-term goal is to evolve MAAM from a reporting platform into an intellige
 
 # Current Version
 
-**MAAM v4.0**
+**MAAM v5.0**
