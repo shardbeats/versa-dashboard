@@ -340,7 +340,7 @@ Current models include:
 
 - dashboard_overview
 - youtube_video_performance
-- youtube_country_performance
+- exclusive_value_estimates
 - beatstars_sales_performance
 - beatstars_daily_beat_sales
 - beatstars_monthly_beat_sales
