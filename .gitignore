@@ -50,3 +50,7 @@ maam-dashboard2.jpg
 local/data.db
 *.db
 
+
+# Google OAuth (cualquier variante descargada)
+client_secret*.json
+
