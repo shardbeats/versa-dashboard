@@ -20,6 +20,7 @@ from src.transform.youtube import (
 )
 
 from .db import get_conn
+from .matching import beat_key, extract_beat_name
 
 
 def today_str() -> str:
@@ -42,6 +43,8 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
     if max_videos:
         videos_df = videos_df.head(max_videos)
     videos_df = clean_youtube_metadata(videos_df)
+    # Parser mejorado: tambien entiende '"Beat" | resto' (sin ' - ')
+    videos_df["beat_name"] = videos_df["title"].apply(extract_beat_name)
 
     statistics_df = extract_video_statistics(creds, videos_df)
     videos_df = merge_video_statistics(videos_df, statistics_df)
@@ -90,15 +93,17 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
     )
 
     for _, r in dim.iterrows():
+        bk = beat_key(r.get("beat_name", ""))
         cur.execute(
             """INSERT OR REPLACE INTO videos
-               (video_id, channel_id, title, beat_name, published_at, duration, duration_seconds, is_short)
-               VALUES (?,?,?,?,?,?,?,?)""",
+               (video_id, channel_id, title, beat_name, beat_key, published_at, duration, duration_seconds, is_short)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
             (
                 r["video_id"],
                 channel_id,
                 str(r["title"]),
                 str(r.get("beat_name", "")),
+                bk,
                 str(r["published_at"]),
                 str(r["duration"]),
                 int(r["duration_seconds"]),

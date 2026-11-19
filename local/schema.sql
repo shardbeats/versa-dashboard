@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS videos (
   channel_id TEXT,
   title TEXT,
   beat_name TEXT,
+  beat_key TEXT,
   published_at TEXT,
   duration TEXT,
   duration_seconds INTEGER,
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS video_metrics_snapshots (
 CREATE TABLE IF NOT EXISTS beatstars_sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   product_name TEXT,
+  beat_key TEXT,
   product_type TEXT,
   quantity REAL DEFAULT 1,
   gross_amount REAL DEFAULT 0,
@@ -86,7 +88,7 @@ FROM channel_snapshots
 ORDER BY channel_id, snapshot_date;
 
 CREATE VIEW IF NOT EXISTS v_beat_cross AS
--- Cruce simple por beat_name normalizado (como MAAM original)
+-- Cruce por beat_key (minusculas, sin acentos ni puntuacion)
 SELECT
   COALESCE(v.beat_name, b.product_name) AS beat,
   SUM(b.net_revenue) AS beatstars_revenue,
@@ -98,5 +100,5 @@ LEFT JOIN video_metrics_snapshots m
   ON m.video_id = v.video_id
   AND m.snapshot_date = (SELECT MAX(snapshot_date) FROM video_metrics_snapshots WHERE video_id = v.video_id)
 LEFT JOIN beatstars_sales b
-  ON LOWER(TRIM(b.product_name)) = LOWER(TRIM(v.beat_name))
+  ON b.beat_key = v.beat_key AND b.beat_key <> ''
 GROUP BY 1;
