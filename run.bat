@@ -25,10 +25,13 @@ echo ===== MAAM local =====
 echo 1. Descargar stats de YouTube
 echo 2. Importar CSV de BeatStars
 echo 3. Ver resumen (stats)
+echo 4. Abrir dashboard con graficas
 echo 0. Salir
 echo.
 set "OPT="
-set /p OPT="Elige [0-3]: "
+set /p OPT="Elige [0-4]: "
+
+if "%OPT%"=="4" goto dash
 
 if "%OPT%"=="1" (
   ".venv\Scripts\python.exe" local\main_local.py youtube
@@ -53,4 +56,11 @@ if "%OPT%"=="3" (
 if "%OPT%"=="0" exit /b 0
 
 echo Opcion no valida.
+goto menu
+
+:dash
+echo [run] Abriendo dashboard en http://localhost:8501 ...
+".venv\Scripts\python.exe" -m streamlit run local\dashboard.py
+echo.
+pause
 goto menu

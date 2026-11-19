@@ -36,7 +36,13 @@ python local/main_local.py beatstars --csv "D:\ruta\sales_report.csv"
 
 # ver resumen
 python local/main_local.py stats
+
+# dashboard con graficas (http://localhost:8501)
+python -m streamlit run local/dashboard.py
 ```
+
+O más fácil: doble-click a `run.bat` → opción **4** abre el dashboard.
+Pestañas: Resumen (KPIs + top beats), Crecimiento (subs/views/veltas), Videos (top 30), BeatStars x YT (revenue por beat + países).
 
 Tablas: `channels`, `channel_snapshots`, `videos`, `video_metrics_snapshots`, `beatstars_sales`, `country_views`.
 Vistas: `v_video_latest`, `v_channel_growth`, `v_beat_cross`.
