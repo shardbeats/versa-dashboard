@@ -1,5 +1,6 @@
-"""MAAM local dashboard (Streamlit + SQLite)."""
+"""MAAM local dashboard estilo vidIQ/TubeBuddy (Streamlit + SQLite)."""
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -9,7 +10,7 @@ import streamlit as st
 DB_PATH = Path(__file__).resolve().parent / "data.db"
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=120)
 def q(sql: str) -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
     try:
@@ -18,107 +19,145 @@ def q(sql: str) -> pd.DataFrame:
         conn.close()
 
 
+def checklist(row: pd.Series, med_eng: float, med_vpd: float):
+    tl = len(str(row.get("title", "")))
+    desc = int(row.get("description_len", 0) or 0)
+    tags = int(row.get("tags_count", 0) or 0)
+    return [
+        ("Titulo 30-70 caracteres", 30 <= tl <= 70, f"{tl} caracteres"),
+        ("Descripcion +200 caracteres", desc >= 200, f"{desc} caracteres"),
+        ("Entre 5 y 15 tags", 5 <= tags <= 15, f"{tags} tags"),
+        ("Engagement sobre mediana", float(row.get("engagement_rate", 0) or 0) >= med_eng,
+         f"{row.get('engagement_rate', 0)}% vs {med_eng:.2f}%"),
+        ("Views/dia sobre mediana", float(row.get("views_per_day", 0) or 0) >= med_vpd,
+         f"{row.get('views_per_day', 0)} vs {med_vpd:.1f}"),
+    ]
+
+
 st.set_page_config(page_title="MAAM local", layout="wide")
-st.title("MAAM local — YouTube + BeatStars")
+st.title("MAAM local — estilo vidIQ / TubeBuddy")
 
 if not DB_PATH.exists():
     st.warning("No hay data.db. Corre `run.bat` opcion 1 primero.")
     st.stop()
 
-channels = q("SELECT channel_id, title FROM channels")
+channels = q("SELECT channel_id, title, description, thumbnail_url FROM channels")
 if channels.empty:
     st.warning("Sin canales. Corre `run.bat` opcion 1 primero.")
     st.stop()
 
-chan = st.sidebar.selectbox(
+chan_id = st.sidebar.selectbox(
     "Canal", channels["channel_id"].tolist(),
     format_func=lambda cid: channels.loc[channels.channel_id == cid, "title"].iloc[0],
 )
+ch = channels.loc[channels.channel_id == chan_id].iloc[0]
+snap = q(f"SELECT * FROM channel_snapshots WHERE channel_id='{chan_id}' ORDER BY snapshot_date DESC LIMIT 1")
+vids = q(
+    "SELECT v.*, m.views, m.likes, m.comments, m.watch_time_minutes, m.subs_gained, m.estimated_revenue "
+    "FROM videos v LEFT JOIN video_metrics_snapshots m ON m.video_id=v.video_id "
+    f"WHERE v.channel_id='{chan_id}' "
+    "AND (m.snapshot_date IS NULL OR m.snapshot_date=(SELECT MAX(snapshot_date) FROM video_metrics_snapshots)) "
+    "ORDER BY m.views DESC"
+)
 
-tab1, tab2, tab3, tab4 = st.tabs(["Resumen", "Crecimiento", "Videos", "BeatStars x YT"])
+# ---- KPIs estilo TubeBuddy Channel Summary ----
+c = st.columns(6)
+subs = int(snap.iloc[0]["subs"]) if not snap.empty else 0
+views = int(snap.iloc[0]["views"]) if not snap.empty else 0
+n_vids = len(vids)
+avg_views = round(vids["views"].mean(), 1) if n_vids else 0
+avg_eng = round(vids["engagement_rate"].mean(), 2) if n_vids else 0
+pub = pd.to_datetime(vids["published_at"], utc=True, errors="coerce") if n_vids else pd.Series([], dtype="datetime64[ns, UTC]")
+last30 = int((pub >= (datetime.now(timezone.utc) - pd.Timedelta(days=30))).sum()) if n_vids else 0
+for col, label, val in zip(c,
+    ["Subs", "Views canal", "Videos", "Views/video prom.", "Engagement prom.", "Subidos 30d"],
+    [f"{subs:,}", f"{views:,}", f"{n_vids:,}", f"{avg_views:,}", f"{avg_eng}%", f"{last30}"]):
+    col.metric(label, val)
 
-with tab1:
-    snaps = q(
-        f"SELECT * FROM channel_snapshots WHERE channel_id='{chan}' "
-        "ORDER BY snapshot_date DESC LIMIT 1"
-    )
-    tot_videos = q(f"SELECT COUNT(*) n FROM videos WHERE channel_id='{chan}'").iloc[0, 0]
-    rev = q(
-        "SELECT COALESCE(SUM(estimated_revenue),0) r FROM video_metrics_snapshots m "
-        f"JOIN videos v ON v.video_id=m.video_id WHERE v.channel_id='{chan}' "
-        "AND m.snapshot_date=(SELECT MAX(snapshot_date) FROM video_metrics_snapshots)"
-    ).iloc[0, 0]
-    c1, c2, c3, c4 = st.columns(4)
-    if not snaps.empty:
-        s = snaps.iloc[0]
-        c1.metric("Subs", f"{s['subs']:,}")
-        c2.metric("Views canal", f"{s['views']:,}")
-        c3.metric("Videos", f"{tot_videos:,}")
-        c4.metric("Revenue est. (lifetime)", f"${rev:,.2f}")
-    else:
-        st.info("Sin snapshots todavia. Corre opcion 1.")
+tab_score, tab_rank, tab_time, tab_tags, tab_audit = st.tabs(
+    ["Scorecard", "Rankings", "Mejor hora", "Tags", "Auditoria"])
 
-    cross = q(
-        "SELECT beat, beatstars_revenue, yt_views FROM v_beat_cross "
-        "WHERE beatstars_revenue > 0 OR yt_views > 0 "
-        "ORDER BY COALESCE(beatstars_revenue,0) DESC LIMIT 15"
-    )
-    if not cross.empty:
-        st.subheader("Top beats por revenue BeatStars vs views YT")
-        plot_df = cross.copy()
-        plot_df["beatstars_revenue"] = pd.to_numeric(plot_df["beatstars_revenue"], errors="coerce").fillna(0)
-        plot_df["yt_views"] = pd.to_numeric(plot_df["yt_views"], errors="coerce").fillna(0)
-        plot_df = plot_df.melt(id_vars="beat", value_vars=["beatstars_revenue", "yt_views"],
-                               var_name="metrica", value_name="valor")
-        fig = px.bar(plot_df, x="beat", y="valor", color="metrica",
-                     barmode="group", title="Revenue ($) vs Views")
-        st.plotly_chart(fig, use_container_width=True)
-
-with tab2:
-    growth = q(
-        f"SELECT * FROM v_channel_growth WHERE channel_id='{chan}' ORDER BY snapshot_date"
-    )
-    if growth.empty:
-        st.info("Corre opcion 1 dos dias distintos para ver crecimiento.")
-    else:
-        st.subheader("Subs en el tiempo")
-        st.plotly_chart(px.line(growth, x="snapshot_date", y="subs"), use_container_width=True)
-        st.subheader("Views en el tiempo")
-        st.plotly_chart(px.line(growth, x="snapshot_date", y="views"), use_container_width=True)
-        st.subheader("Delta diario")
-        st.plotly_chart(px.bar(growth, x="snapshot_date", y=["subs_delta", "views_delta"],
-                               barmode="group"), use_container_width=True)
-
-with tab3:
-    vids = q(
-        "SELECT v.title, v.beat_name, m.views, m.likes, m.comments, "
-        "m.watch_time_minutes, m.estimated_revenue "
-        "FROM videos v JOIN video_metrics_snapshots m ON m.video_id=v.video_id "
-        f"WHERE v.channel_id='{chan}' "
-        "AND m.snapshot_date=(SELECT MAX(snapshot_date) FROM video_metrics_snapshots) "
-        "ORDER BY m.views DESC LIMIT 30"
-    )
+with tab_score:
+    st.subheader("Video Scorecard (estilo vidIQ)")
     if vids.empty:
-        st.info("Sin datos de videos.")
+        st.info("Sin videos.")
     else:
-        st.subheader("Top 30 videos por views")
-        st.plotly_chart(px.bar(vids.head(15), x="title", y="views", hover_data=["beat_name", "likes"]),
+        opts = vids["video_id"].tolist()
+        labels = {vid: f"{vids.loc[vids.video_id == vid, 'views'].iloc[0]:,.0f} views | "
+                       f"{str(vids.loc[vids.video_id == vid, 'title'].iloc[0])[:70]}" for vid in opts}
+        sel = st.selectbox("Video", opts, format_func=lambda v: labels[v])
+        row = vids.loc[vids.video_id == sel].iloc[0]
+        med_eng = float(vids["engagement_rate"].median())
+        med_vpd = float(vids["views_per_day"].median())
+        checks = checklist(row, med_eng, med_vpd)
+        score = sum(1 for _, ok, _ in checks if ok) * 20
+
+        left, right = st.columns([1, 2])
+        with left:
+            st.metric("SEO Score", f"{score}/100")
+            st.metric("Views", f"{row['views']:,.0f}")
+            st.metric("Views/dia (VPH aprox)", f"{row['views_per_day']}")
+            st.metric("Engagement", f"{row['engagement_rate']}%")
+            st.metric("Watch time (min)", f"{row['watch_time_minutes']:,.0f}")
+        with right:
+            for name, ok, detail in checks:
+                st.write(("✅ " if ok else "❌ ") + f"**{name}** — {detail}")
+            st.caption(f"Tags ({int(row['tags_count'] or 0)}): {(row['tags'] or '')[:300]}")
+
+with tab_rank:
+    st.subheader("Rankings (estilo TubeBuddy Videolytics)")
+    if vids.empty:
+        st.info("Sin datos.")
+    else:
+        f = st.text_input("Buscar titulo")
+        df = vids.copy()
+        if f:
+            df = df[df["title"].str.contains(f, case=False, na=False)]
+        show = df[["title", "views", "views_per_day", "likes", "comments",
+                    "engagement_rate", "tags_count", "description_len", "seo_score"]].copy()
+        st.dataframe(show, use_container_width=True, column_config={
+            "seo_score": st.column_config.ProgressColumn("SEO", min_value=0, max_value=100),
+            "engagement_rate": st.column_config.NumberColumn("Eng %", format="%.2f"),
+        })
+        st.caption("Tip: ordena por views_per_day para ver que sigue jalando (VPH), no solo historicos.")
+
+with tab_time:
+    st.subheader("Mejor hora para publicar")
+    if vids.empty or pub.isna().all():
+        st.info("Sin fechas.")
+    else:
+        d = pd.DataFrame({"wd": pub.dt.day_name(), "h": pub.dt.hour, "v": vids["views"].fillna(0).values})
+        order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        piv = d.pivot_table(index="wd", columns="h", values="v", aggfunc="count", fill_value=0).reindex(order)
+        st.plotly_chart(px.imshow(piv, labels=dict(x="Hora", y="Dia", color="# subidos"),
+                                  title="Cuantos subes por dia/hora"), use_container_width=True)
+        avg_wd = d.groupby("wd")["v"].mean().reindex(order)
+        st.plotly_chart(px.bar(avg_wd, title="Views promedio por dia de publicacion"),
                         use_container_width=True)
-        st.dataframe(vids, use_container_width=True)
 
-with tab4:
-    beats = q(
-        "SELECT product_name, SUM(net_revenue) rev, COUNT(*) ventas "
-        "FROM beatstars_sales GROUP BY 1 ORDER BY rev DESC LIMIT 30"
-    )
-    if beats.empty:
-        st.info("Sin ventas. Importa tu CSV con opcion 2.")
+with tab_tags:
+    st.subheader("Tags (estilo TubeBuddy Tag Explorer)")
+    if vids.empty or int(vids["tags_count"].sum()) == 0:
+        st.info("Sin tags (re-corre opcion 1 para traerlos).")
     else:
-        st.subheader("Top beats por revenue")
-        st.plotly_chart(px.bar(beats, x="product_name", y="rev"), use_container_width=True)
-        st.dataframe(beats, use_container_width=True)
+        all_tags = ",".join(vids["tags"].fillna("")).split(",")
+        t = pd.Series([x.strip() for x in all_tags if x.strip()]).value_counts().head(25)
+        st.plotly_chart(px.bar(t, title="Tags mas usados"), use_container_width=True)
+        st.caption(f"Promedio de tags por video: {vids['tags_count'].mean():.1f} "
+                   "(vidIQ sugiere 5-15)")
 
-    countries = q("SELECT country_code, SUM(views) views FROM country_views GROUP BY 1 ORDER BY views DESC LIMIT 20")
-    if not countries.empty:
-        st.subheader("Views por pais")
-        st.plotly_chart(px.bar(countries, x="country_code", y="views"), use_container_width=True)
+with tab_audit:
+    st.subheader("Auditoria del canal (estilo vidIQ Audit)")
+    items = []
+    items.append(("Descripcion del canal completa (+100)", len(str(ch.get("description", ""))) >= 100,
+                  f"{len(str(ch.get('description', '')))} caracteres"))
+    items.append(("Subiendo consistente (3+ videos / 30d)", last30 >= 3, f"{last30} en 30d"))
+    if n_vids:
+        pct_tags = (vids["tags_count"] >= 5).mean() * 100
+        pct_desc = (vids["description_len"] >= 200).mean() * 100
+        items.append(("80%+ videos con 5+ tags", pct_tags >= 80, f"{pct_tags:.0f}%"))
+        items.append(("80%+ videos con descripcion larga", pct_desc >= 80, f"{pct_desc:.0f}%"))
+        shorts = int(vids["is_short"].sum())
+        items.append(("Mezcla Shorts/Long (info)", True, f"{shorts} shorts / {n_vids - shorts} largos"))
+    for name, ok, detail in items:
+        st.write(("✅ " if ok else "⚠️ ") + f"**{name}** — {detail}")

@@ -6,6 +6,8 @@ PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS channels (
   channel_id TEXT PRIMARY KEY,
   title TEXT,
+  description TEXT DEFAULT '',
+  thumbnail_url TEXT DEFAULT '',
   uploads_playlist_id TEXT,
   fetched_at TEXT NOT NULL
 );
@@ -30,6 +32,13 @@ CREATE TABLE IF NOT EXISTS videos (
   duration TEXT,
   duration_seconds INTEGER,
   is_short INTEGER DEFAULT 0,
+  tags TEXT DEFAULT '',
+  tags_count INTEGER DEFAULT 0,
+  description_len INTEGER DEFAULT 0,
+  category_id TEXT DEFAULT '',
+  views_per_day REAL DEFAULT 0,
+  engagement_rate REAL DEFAULT 0,
+  seo_score INTEGER DEFAULT 0,
   FOREIGN KEY (channel_id) REFERENCES channels(channel_id)
 );
 

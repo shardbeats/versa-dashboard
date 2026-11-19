@@ -21,6 +21,7 @@ from src.transform.youtube import (
 
 from .db import get_conn
 from .matching import beat_key, extract_beat_name
+from .video_extra import compute_video_metrics, extract_video_snippets
 
 
 def today_str() -> str:
@@ -34,7 +35,8 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
     channel = extract_channel_info(creds)
     item = channel["items"][0]
     channel_id = item["id"]
-    title = item["snippet"]["title"]
+    snippet = item.get("snippet", {})
+    title = snippet.get("title", "")
     stats = item.get("statistics", {})
     uploads_playlist_id = item["contentDetails"]["relatedPlaylists"]["uploads"]
 
@@ -48,6 +50,21 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
 
     statistics_df = extract_video_statistics(creds, videos_df)
     videos_df = merge_video_statistics(videos_df, statistics_df)
+
+    # Snippet: tags + descripcion (para scorecard SEO estilo vidIQ)
+    try:
+        snippets_df = extract_video_snippets(creds, videos_df)
+        videos_df = videos_df.merge(snippets_df, on="video_id", how="left")
+        for col, default in [("tags", ""), ("tags_count", 0), ("description_len", 0), ("category_id", "")]:
+            if col not in videos_df.columns:
+                videos_df[col] = default
+        videos_df[["tags_count", "description_len"]] = videos_df[["tags_count", "description_len"]].fillna(0)
+        videos_df["tags"] = videos_df["tags"].fillna("")
+    except Exception as e:
+        print(f"[warn] snippets no disponibles: {e}")
+        for col, default in [("tags", ""), ("tags_count", 0), ("description_len", 0), ("category_id", "")]:
+            if col not in videos_df.columns:
+                videos_df[col] = default
 
     try:
         analytics_df = extract_video_analytics(creds, videos_df)
@@ -68,6 +85,8 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
 
     validate_youtube_data(videos_df)
 
+    videos_df = compute_video_metrics(videos_df)
+
     dim = create_dim_youtube_video(videos_df)
     fact = create_fact_youtube_video_metrics(videos_df)
 
@@ -78,8 +97,10 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
     cur = conn.cursor()
 
     cur.execute(
-        "INSERT OR REPLACE INTO channels(channel_id, title, uploads_playlist_id, fetched_at) VALUES (?,?,?,?)",
-        (channel_id, title, uploads_playlist_id, now_iso),
+        "INSERT OR REPLACE INTO channels(channel_id, title, description, thumbnail_url, uploads_playlist_id, fetched_at) VALUES (?,?,?,?,?,?)",
+        (channel_id, title, str(snippet.get("description", ""))[:2000],
+         str(snippet.get("thumbnails", {}).get("default", {}).get("url", "")),
+         uploads_playlist_id, now_iso),
     )
     cur.execute(
         "INSERT OR REPLACE INTO channel_snapshots(channel_id, snapshot_date, subs, views, video_count) VALUES (?,?,?,?,?)",
@@ -94,10 +115,13 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
 
     for _, r in dim.iterrows():
         bk = beat_key(r.get("beat_name", ""))
+        mv = videos_df.loc[videos_df["video_id"] == r["video_id"]]
+        mv = mv.iloc[0] if not mv.empty else r
         cur.execute(
             """INSERT OR REPLACE INTO videos
-               (video_id, channel_id, title, beat_name, beat_key, published_at, duration, duration_seconds, is_short)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+               (video_id, channel_id, title, beat_name, beat_key, published_at, duration, duration_seconds, is_short,
+                tags, tags_count, description_len, category_id, views_per_day, engagement_rate, seo_score)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 r["video_id"],
                 channel_id,
@@ -108,6 +132,13 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
                 str(r["duration"]),
                 int(r["duration_seconds"]),
                 1 if bool(r.get("is_short")) else 0,
+                str(mv.get("tags", "") or "")[:4000],
+                int(mv.get("tags_count", 0) or 0),
+                int(mv.get("description_len", 0) or 0),
+                str(mv.get("category_id", "") or ""),
+                float(mv.get("views_per_day", 0) or 0),
+                float(mv.get("engagement_rate", 0) or 0),
+                int(mv.get("seo_score", 0) or 0),
             ),
         )
 
