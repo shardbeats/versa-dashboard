@@ -51,6 +51,17 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
         videos_df = merge_youtube_analytics(videos_df, analytics_df)
     except Exception as e:
         print(f"\n[warn] Analytics API no disponible, sigo solo con Data API: {e}")
+        # create_fact exige estas columnas: las relleno con 0 para modo solo-Data-API
+        for col, default in [
+            ("watch_time_minutes", 0.0),
+            ("average_view_duration_seconds", 0.0),
+            ("average_view_percentage", 0.0),
+            ("estimated_revenue", 0.0),
+            ("subscribers_gained", 0),
+            ("subscribers_lost", 0),
+        ]:
+            if col not in videos_df.columns:
+                videos_df[col] = default
 
     validate_youtube_data(videos_df)
 
