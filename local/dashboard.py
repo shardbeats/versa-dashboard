@@ -74,8 +74,8 @@ for col, label, val in zip(c,
     [f"{subs:,}", f"{views:,}", f"{n_vids:,}", f"{avg_views:,}", f"{avg_eng}%", f"{last30}"]):
     col.metric(label, val)
 
-tab_score, tab_rank, tab_time, tab_tags, tab_audit = st.tabs(
-    ["Scorecard", "Rankings", "Mejor hora", "Tags", "Auditoria"])
+tab_score, tab_rank, tab_time, tab_tags, tab_traf, tab_aud, tab_out, tab_audit = st.tabs(
+    ["Scorecard", "Rankings", "Mejor hora", "Tags", "Trafico", "Audiencia", "Outliers", "Auditoria"])
 
 with tab_score:
     st.subheader("Video Scorecard (estilo vidIQ)")
@@ -145,6 +145,103 @@ with tab_tags:
         st.plotly_chart(px.bar(t, title="Tags mas usados"), use_container_width=True)
         st.caption(f"Promedio de tags por video: {vids['tags_count'].mean():.1f} "
                    "(vidIQ sugiere 5-15)")
+
+with tab_traf:
+    st.subheader("De donde viene la vista (28d)")
+    traf = q("SELECT * FROM traffic_sources WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM traffic_sources)")
+    dev = q("SELECT * FROM device_views WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM device_views)")
+    search = q("SELECT * FROM search_terms WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM search_terms) ORDER BY views DESC LIMIT 20")
+    imp = q("SELECT video_id, views_28d, impressions_28d, ctr_28d FROM video_impressions WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM video_impressions)")
+    if traf.empty and dev.empty and imp.empty:
+        st.info("Sin analytics profundo. Corre `run.bat` → opcion youtube, o `python local/main_local.py analytics`.")
+    else:
+        if not traf.empty:
+            st.plotly_chart(px.pie(traf, names="source", values="views", title="Views por fuente de trafico (28d)"),
+                            use_container_width=True)
+            st.dataframe(traf, use_container_width=True)
+        if not dev.empty:
+            st.plotly_chart(px.bar(dev, x="device", y="views", title="Views por dispositivo (28d)"),
+                            use_container_width=True)
+        if not search.empty:
+            st.subheader("Que buscan para encontrarte (28d)")
+            st.plotly_chart(px.bar(search, x="views", y="term", orientation="h", title="Top terminos de busqueda"),
+                            use_container_width=True)
+        if not imp.empty:
+            has_ctr = float(imp["ctr_28d"].fillna(0).max()) > 0
+            top28 = imp.merge(vids[["video_id", "title"]], on="video_id", how="left").sort_values("views_28d", ascending=False).head(15)
+            st.subheader("Top videos 28d (velocidad real)")
+            st.dataframe(top28[["title", "views_28d"]], use_container_width=True)
+            if has_ctr:
+                st.subheader("CTR vs Views (28d, estilo vidIQ)")
+                sc = imp.merge(vids[["video_id", "title"]], on="video_id", how="left")
+                st.plotly_chart(px.scatter(sc, x="impressions_28d", y="views_28d", size="ctr_28d",
+                                           hover_data=["title", "ctr_28d"],
+                                           labels={"impressions_28d": "Impresiones", "views_28d": "Views 28d", "ctr_28d": "CTR"},
+                                           title="Impresiones vs Views (tamano = CTR)"), use_container_width=True)
+                low_ctr = sc[(sc["impressions_28d"] >= 1000) & (sc["ctr_28d"] < 0.03)].sort_values("impressions_28d", ascending=False).head(10)
+                if not low_ctr.empty:
+                    st.warning("Miniaturas a mejorar (muchas impresiones, CTR < 3%):")
+                    st.dataframe(low_ctr[["title", "impressions_28d", "views_28d", "ctr_28d"]], use_container_width=True)
+            else:
+                st.caption("Nota: YouTube saco CTR/impresiones de la API en vivo (solo bulk Reporting API con 48h retraso). Arriba tienes views 28d reales por video.")
+
+with tab_aud:
+    st.subheader("Quien te ve (28d)")
+    demo = q("SELECT * FROM demographics WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM demographics)")
+    ctry = q("SELECT * FROM country_views WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM country_views) ORDER BY views DESC LIMIT 15")
+    if demo.empty and ctry.empty:
+        st.info("Sin datos de audiencia. Corre analytics.")
+    else:
+        if not demo.empty:
+            st.caption("La API solo da % de viewers logueados (viewerPercentage), no views crudos.")
+            piv = demo.pivot_table(index="age_group", columns="gender", values="views", fill_value=0)
+            st.plotly_chart(px.imshow(piv, labels=dict(x="Genero", y="Edad", color="Views"),
+                                      title="Views por edad/genero (28d)"), use_container_width=True)
+            st.dataframe(demo, use_container_width=True)
+        if not ctry.empty:
+            st.plotly_chart(px.bar(ctry, x="country_code", y="views", title="Top paises"),
+                            use_container_width=True)
+
+with tab_out:
+    st.subheader("Outliers + velocidad real (estilo vidIQ)")
+    vel = q("SELECT * FROM v_video_velocity")
+    imp28 = q("SELECT video_id, views_28d, impressions_28d, ctr_28d FROM video_impressions WHERE snapshot_date=(SELECT MAX(snapshot_date) FROM video_impressions)")
+    if vids.empty:
+        st.info("Sin videos.")
+    else:
+        base = vids[["video_id", "title", "views", "views_per_day"]].copy()
+        if not vel.empty:
+            base = base.merge(vel[["video_id", "views_gain", "days_diff", "views_per_day_real"]], on="video_id", how="left")
+        else:
+            base["views_gain"] = 0
+            base["days_diff"] = 0
+            base["views_per_day_real"] = 0
+        base[["views_gain", "days_diff", "views_per_day_real"]] = base[["views_gain", "days_diff", "views_per_day_real"]].fillna(0)
+        has_hist = (base["days_diff"] > 0).any()
+        # Preferir views 28d reales de Analytics (views_28d/28) sobre snapshot diff
+        if not imp28.empty and int(imp28["views_28d"].fillna(0).sum()) > 0:
+            base = base.merge(imp28[["video_id", "views_28d"]], on="video_id", how="left")
+            base["views_28d"] = base["views_28d"].fillna(0)
+            base["vel"] = (base["views_28d"] / 28).round(1)
+            src = "real 28d (Analytics)"
+        else:
+            base["vel"] = base["views_per_day_real"].where(has_hist, base["views_per_day"])
+            src = "real, entre snapshots" if has_hist else "aprox: views/edad, corre 2 dias para velocidad real"
+        med = base["vel"].median()
+        base["outlier_x"] = (base["vel"] / med.replace(0, 1)).round(1)
+        st.caption(f"Mediana velocidad: {med:.1f} views/dia ({src})")
+        top = base.sort_values("vel", ascending=False).head(15)
+        st.plotly_chart(px.bar(top, x="title", y="vel", hover_data=["views", "outlier_x"],
+                               labels={"vel": "Views/dia", "title": ""},
+                               title="Top velocidad (VPH)"), use_container_width=True)
+        out = base[base["outlier_x"] >= 3].sort_values("outlier_x", ascending=False)
+        if out.empty:
+            st.info("Aun no hay outliers (3x sobre la mediana). Con 2+ dias de datos aparecen solos.")
+        else:
+            st.success(f"{len(out)} outliers (>=3x mediana):")
+            st.dataframe(out[["title", "views", "vel", "outlier_x"]], use_container_width=True)
+        if not imp28.empty:
+            st.caption("Cruza con CTR: un outlier con CTR alto = formato/miniatura ganadora, repitelo.")
 
 with tab_audit:
     st.subheader("Auditoria del canal (estilo vidIQ Audit)")

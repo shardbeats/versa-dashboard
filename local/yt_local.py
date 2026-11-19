@@ -179,6 +179,45 @@ def run_youtube_local(db_path=None, max_videos: int | None = None):
     except Exception as e:
         print(f"[warn] country views skip: {e}")
 
+    # Analytics profundo 28d (best effort, 1 query por reporte = barato)
+    try:
+        from .analytics_extra import (
+            extract_demographics,
+            extract_devices,
+            extract_search_terms,
+            extract_traffic_sources,
+            extract_video_impressions,
+        )
+
+        yt_analytics = build("youtubeAnalytics", "v2", credentials=creds)
+        for _, r in extract_traffic_sources(yt_analytics).iterrows():
+            cur.execute(
+                "INSERT OR REPLACE INTO traffic_sources(snapshot_date, source, views, watch_minutes) VALUES (?,?,?,?)",
+                (snapshot_date, str(r["source"]), int(r["views"]), float(r["watch_minutes"])),
+            )
+        for _, r in extract_devices(yt_analytics).iterrows():
+            cur.execute(
+                "INSERT OR REPLACE INTO device_views(snapshot_date, device, views, watch_minutes) VALUES (?,?,?,?)",
+                (snapshot_date, str(r["device"]), int(r["views"]), float(r["watch_minutes"])),
+            )
+        for _, r in extract_search_terms(yt_analytics).iterrows():
+            cur.execute(
+                "INSERT OR REPLACE INTO search_terms(snapshot_date, term, views) VALUES (?,?,?)",
+                (snapshot_date, str(r["term"])[:300], int(r["views"])),
+            )
+        for _, r in extract_demographics(yt_analytics).iterrows():
+            cur.execute(
+                "INSERT OR REPLACE INTO demographics(snapshot_date, age_group, gender, views, watch_minutes) VALUES (?,?,?,?,?)",
+                (snapshot_date, str(r["age_group"]), str(r["gender"]), int(r["views"]), float(r["watch_minutes"])),
+            )
+        for _, r in extract_video_impressions(creds, videos_df).iterrows():
+            cur.execute(
+                "INSERT OR REPLACE INTO video_impressions(video_id, snapshot_date, views_28d, impressions_28d, ctr_28d) VALUES (?,?,?,?,?)",
+                (r["video_id"], snapshot_date, int(r["views_28d"]), int(r["impressions_28d"]), float(r["ctr_28d"])),
+            )
+    except Exception as e:
+        print(f"[warn] analytics profundo skip: {e}")
+
     conn.commit()
 
     n_videos = cur.execute("SELECT COUNT(*) FROM videos").fetchone()[0]

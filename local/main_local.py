@@ -27,6 +27,55 @@ def cmd_beatstars(args):
     import_beatstars_csv(args.csv, db_path=args.db)
 
 
+def cmd_analytics(args):
+    from datetime import date
+    from googleapiclient.discovery import build
+    from src.auth import authenticate
+    from local.analytics_extra import (
+        extract_demographics,
+        extract_devices,
+        extract_search_terms,
+        extract_traffic_sources,
+        extract_video_impressions,
+    )
+    import pandas as pd
+
+    init_db(args.db or DB_PATH)
+    creds = authenticate()
+    conn = get_conn(args.db)
+    snap = date.today().isoformat()
+    yt_analytics = build("youtubeAnalytics", "v2", credentials=creds)
+    vids = pd.read_sql_query("SELECT video_id FROM videos", conn)
+
+    n = 0
+    for _, r in extract_traffic_sources(yt_analytics).iterrows():
+        conn.execute(
+            "INSERT OR REPLACE INTO traffic_sources(snapshot_date, source, views, watch_minutes) VALUES (?,?,?,?)",
+            (snap, str(r["source"]), int(r["views"]), float(r["watch_minutes"])),)
+        n += 1
+    for _, r in extract_devices(yt_analytics).iterrows():
+        conn.execute(
+            "INSERT OR REPLACE INTO device_views(snapshot_date, device, views, watch_minutes) VALUES (?,?,?,?)",
+            (snap, str(r["device"]), int(r["views"]), float(r["watch_minutes"])))
+    for _, r in extract_search_terms(yt_analytics).iterrows():
+        conn.execute(
+            "INSERT OR REPLACE INTO search_terms(snapshot_date, term, views) VALUES (?,?,?)",
+            (snap, str(r["term"])[:300], int(r["views"])))
+    for _, r in extract_demographics(yt_analytics).iterrows():
+        conn.execute(
+            "INSERT OR REPLACE INTO demographics(snapshot_date, age_group, gender, views, watch_minutes) VALUES (?,?,?,?,?)",
+            (snap, str(r["age_group"]), str(r["gender"]), int(r["views"]), float(r["watch_minutes"])))
+    m = 0
+    for _, r in extract_video_impressions(creds, vids).iterrows():
+        conn.execute(
+            "INSERT OR REPLACE INTO video_impressions(video_id, snapshot_date, views_28d, impressions_28d, ctr_28d) VALUES (?,?,?,?,?)",
+            (r["video_id"], snap, int(r["views_28d"]), int(r["impressions_28d"]), float(r["ctr_28d"])))
+        m += 1
+    conn.commit()
+    conn.close()
+    print(f"OK analytics 28d ({snap}): trafico/device/search/demo + {m} videos con CTR")
+
+
 def cmd_stats(args):
     conn = get_conn(args.db)
     cur = conn.cursor()
@@ -75,6 +124,9 @@ def main():
     s = sub.add_parser("beatstars", help="Importar CSV de BeatStars")
     s.add_argument("--csv", required=True)
     s.set_defaults(fn=cmd_beatstars)
+
+    s = sub.add_parser("analytics", help="Solo analytics profundo 28d (trafico, CTR, busqueda, demo)")
+    s.set_defaults(fn=cmd_analytics)
 
     s = sub.add_parser("stats", help="Ver resumen local")
     s.set_defaults(fn=cmd_stats)

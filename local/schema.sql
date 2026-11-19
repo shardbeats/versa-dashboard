@@ -80,6 +80,48 @@ CREATE TABLE IF NOT EXISTS country_views (
   PRIMARY KEY (snapshot_date, country_code)
 );
 
+-- Analytics profundo (ultimos 28d, un snapshot por dia)
+CREATE TABLE IF NOT EXISTS traffic_sources (
+  snapshot_date TEXT NOT NULL,
+  source TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  watch_minutes REAL DEFAULT 0,
+  PRIMARY KEY (snapshot_date, source)
+);
+
+CREATE TABLE IF NOT EXISTS device_views (
+  snapshot_date TEXT NOT NULL,
+  device TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  watch_minutes REAL DEFAULT 0,
+  PRIMARY KEY (snapshot_date, device)
+);
+
+CREATE TABLE IF NOT EXISTS search_terms (
+  snapshot_date TEXT NOT NULL,
+  term TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  PRIMARY KEY (snapshot_date, term)
+);
+
+CREATE TABLE IF NOT EXISTS demographics (
+  snapshot_date TEXT NOT NULL,
+  age_group TEXT NOT NULL,
+  gender TEXT NOT NULL,
+  views INTEGER DEFAULT 0,
+  watch_minutes REAL DEFAULT 0,
+  PRIMARY KEY (snapshot_date, age_group, gender)
+);
+
+CREATE TABLE IF NOT EXISTS video_impressions (
+  video_id TEXT NOT NULL,
+  snapshot_date TEXT NOT NULL,
+  views_28d INTEGER DEFAULT 0,
+  impressions_28d INTEGER DEFAULT 0,
+  ctr_28d REAL DEFAULT 0,
+  PRIMARY KEY (video_id, snapshot_date)
+);
+
 -- Vistas tipo Gold (reemplazo minimo de dbt)
 CREATE VIEW IF NOT EXISTS v_video_latest AS
 SELECT v.*, m.*
@@ -95,6 +137,23 @@ SELECT channel_id, snapshot_date, subs, views, video_count,
   views - LAG(views) OVER (PARTITION BY channel_id ORDER BY snapshot_date) AS views_delta
 FROM channel_snapshots
 ORDER BY channel_id, snapshot_date;
+
+-- Velocidad real: diferencia entre los 2 ultimos snapshots por video
+CREATE VIEW IF NOT EXISTS v_video_velocity AS
+WITH r AS (
+  SELECT video_id, snapshot_date, views,
+    LAG(views) OVER (PARTITION BY video_id ORDER BY snapshot_date) AS prev_views,
+    LAG(snapshot_date) OVER (PARTITION BY video_id ORDER BY snapshot_date) AS prev_date
+  FROM video_metrics_snapshots
+)
+SELECT video_id, snapshot_date, views,
+  COALESCE(views - prev_views, 0) AS views_gain,
+  COALESCE(julianday(snapshot_date) - julianday(prev_date), 0) AS days_diff,
+  CASE WHEN COALESCE(julianday(snapshot_date) - julianday(prev_date), 0) > 0
+       THEN (views - prev_views) / (julianday(snapshot_date) - julianday(prev_date))
+       ELSE 0 END AS views_per_day_real
+FROM r
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM video_metrics_snapshots);
 
 CREATE VIEW IF NOT EXISTS v_beat_cross AS
 -- Cruce por beat_key (minusculas, sin acentos ni puntuacion)

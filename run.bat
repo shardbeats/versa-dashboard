@@ -26,10 +26,11 @@ echo 1. Descargar stats de YouTube
 echo 2. Importar CSV de BeatStars
 echo 3. Ver resumen (stats)
 echo 4. Abrir dashboard con graficas
+echo 5. Analytics profundo 28d (trafico/busqueda/demo)
 echo 0. Salir
 echo.
 set "OPT="
-set /p OPT="Elige [0-4]: "
+set /p OPT="Elige [0-5]: "
 
 if "%OPT%"=="4" goto dash
 
@@ -54,6 +55,12 @@ if "%OPT%"=="3" (
   goto menu
 )
 if "%OPT%"=="0" exit /b 0
+if "%OPT%"=="5" (
+  ".venv\Scripts\python.exe" local\main_local.py analytics
+  echo.
+  pause
+  goto menu
+)
 
 echo Opcion no valida.
 goto menu
