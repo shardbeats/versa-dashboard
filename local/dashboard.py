@@ -227,8 +227,9 @@ with tab_out:
         else:
             base["vel"] = base["views_per_day_real"].where(has_hist, base["views_per_day"])
             src = "real, entre snapshots" if has_hist else "aprox: views/edad, corre 2 dias para velocidad real"
-        med = base["vel"].median()
-        base["outlier_x"] = (base["vel"] / med.replace(0, 1)).round(1)
+        med = float(base["vel"].median())
+        denom = med if med != 0 else 1.0
+        base["outlier_x"] = (base["vel"] / denom).round(1)
         st.caption(f"Mediana velocidad: {med:.1f} views/dia ({src})")
         top = base.sort_values("vel", ascending=False).head(15)
         st.plotly_chart(px.bar(top, x="title", y="vel", hover_data=["views", "outlier_x"],
