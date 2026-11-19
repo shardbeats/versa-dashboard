@@ -46,3 +46,7 @@ maam-dashboard2.jpg
 **/logs/
 **/target/
 **/.user.yml
+# Local SQLite
+local/data.db
+*.db
+
