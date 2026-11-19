@@ -18,10 +18,9 @@ if not exist ".venv\Scripts\python.exe" (
   echo [start] .venv ya existe, lo reutilizo.
 )
 
-call ".venv\Scripts\activate.bat"
-python -m pip install --upgrade pip >nul 2>&1
 echo [start] Instalando dependencias...
-pip install -r local\requirements-local.txt
+".venv\Scripts\python.exe" -m pip install --upgrade pip >nul 2>&1
+".venv\Scripts\python.exe" -m pip install -r local\requirements-local.txt
 if errorlevel 1 (
   echo [start] ERROR instalando requirements
   pause
@@ -29,7 +28,7 @@ if errorlevel 1 (
 )
 
 echo [start] Creando base de datos...
-python local\main_local.py init
+".venv\Scripts\python.exe" local\main_local.py init
 if errorlevel 1 (
   echo [start] ERROR creando data.db
   pause
@@ -39,7 +38,8 @@ if errorlevel 1 (
 if not exist "client_secret.json" (
   echo.
   echo [start] AVISO: falta client_secret.json en esta carpeta.
-  echo Ponlo aqui y luego usa run.bat para descargar stats.
+  echo Renombra tu descarga de Google a client_secret.json, ponla aqui
+  echo y luego usa run.bat para descargar stats.
 ) else (
   echo [start] client_secret.json OK.
 )

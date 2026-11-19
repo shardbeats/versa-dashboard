@@ -10,11 +10,9 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-call ".venv\Scripts\activate.bat"
-
 REM Si hay argumentos, ejecucion directa
 if not "%~1"=="" (
-  python local\main_local.py %*
+  ".venv\Scripts\python.exe" local\main_local.py %*
   echo.
   pause
   exit /b %errorlevel%
@@ -29,23 +27,25 @@ echo 2. Importar CSV de BeatStars
 echo 3. Ver resumen (stats)
 echo 0. Salir
 echo.
+set "OPT="
 set /p OPT="Elige [0-3]: "
 
 if "%OPT%"=="1" (
-  python local\main_local.py youtube
+  ".venv\Scripts\python.exe" local\main_local.py youtube
   echo.
   pause
   goto menu
 )
 if "%OPT%"=="2" (
+  set "CSV="
   set /p CSV="Ruta del CSV de BeatStars: "
-  python local\main_local.py beatstars --csv "%CSV%"
+  ".venv\Scripts\python.exe" local\main_local.py beatstars --csv "%CSV%"
   echo.
   pause
   goto menu
 )
 if "%OPT%"=="3" (
-  python local\main_local.py stats
+  ".venv\Scripts\python.exe" local\main_local.py stats
   echo.
   pause
   goto menu
