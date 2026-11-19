@@ -65,7 +65,12 @@ with tab1:
     )
     if not cross.empty:
         st.subheader("Top beats por revenue BeatStars vs views YT")
-        fig = px.bar(cross, x="beat", y=["beatstars_revenue", "yt_views"],
+        plot_df = cross.copy()
+        plot_df["beatstars_revenue"] = pd.to_numeric(plot_df["beatstars_revenue"], errors="coerce").fillna(0)
+        plot_df["yt_views"] = pd.to_numeric(plot_df["yt_views"], errors="coerce").fillna(0)
+        plot_df = plot_df.melt(id_vars="beat", value_vars=["beatstars_revenue", "yt_views"],
+                               var_name="metrica", value_name="valor")
+        fig = px.bar(plot_df, x="beat", y="valor", color="metrica",
                      barmode="group", title="Revenue ($) vs Views")
         st.plotly_chart(fig, use_container_width=True)
 
